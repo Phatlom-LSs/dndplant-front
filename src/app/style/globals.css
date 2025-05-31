@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+:root {
+  --background: #002b5c;
+  --foreground: #ffffff;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+}
+
+.header {
+  background-color: rgb(255, 255, 255);
+  color: #002b5c;
+  box-shadow: 0 0 40px rgba(8, 7, 16, 0.655);
+  display: flex;
+  align-items: center;
+  padding: 16px 16px;
+  gap: 20px;
+}
+
+.InET_logo {
+  margin-right: 20px;
+  position: relative;
+  left: 1000px;
+}
+
+.CIT_logo {
+  margin-right: 20px;
+  position: relative;
+  left: 640px;
+}
+
+.site-title {
+  font-size: 30px;
+  font-weight: bold;
+  padding: 16 16px;
+  left: -160px;
+}
+
+.button {
+  align-items: center;
+  appearance: none;
+  background-color: #FCFCFD;
+  border-radius: 4px;
+  border-width: 0;
+  box-shadow: rgba(45, 35, 66, 0.4) 0 2px 4px,rgba(45, 35, 66, 0.3) 0 7px 13px -3px,#D6D6E7 0 -3px 0 inset;
+  box-sizing: border-box;
+  color: #36395A;
+  cursor: pointer;
+  display: inline-flex;
+  font-family: 'Arial', sans-serif;
+  height: 48px;
+  justify-content: center;
+  line-height: 1;
+  list-style: none;
+  overflow: hidden;
+  padding-left: 16px;
+  padding-right: 16px;
+  position: relative;
+  top: -90px;
+  left: 900px;
+  text-align: left;
+  text-decoration: none;
+  transition: box-shadow .15s,transform .15s;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  white-space: nowrap;
+  will-change: box-shadow,transform;
+  font-size: 18px;
+}
+
+.button:focus {
+box-shadow: #D6D6E7 0 0 0 1.5px inset, rgba(45, 35, 66, 0.4) 0 2px 4px, rgba(45, 35, 66, 0.3) 0 7px 13px -3px, #D6D6E7 0 -3px 0 inset;
+}
+
+.button:hover {
+box-shadow: rgba(45, 35, 66, 0.4) 0 4px 8px, rgba(45, 35, 66, 0.3) 0 7px 13px -3px, #D6D6E7 0 -3px 0 inset;
+transform: translateY(-2px);
+}
+
+.button:active {
+box-shadow: #D6D6E7 0 3px 7px inset;
+transform: translateY(2px);
+}
+
+.about {
+max-width: 50%;
+position: relative;
+right: -120px;
+top: 20px;
+background-color: rgba(255,255,255,0.13);
+background-color: rgb(61, 58, 58);
+border-radius: 10px;
+backdrop-filter: blur(20px);
+border: 2px solid rgba(255,255,255,0.1);
+box-shadow: 0 0 40px rgba(8,7,16,0.6);
+padding: 50px 50px;
+letter-spacing: 0.5px;
+outline: none;
+border: none;
+}
+
+#headerAbout {
+font-size: 40px;
+font-weight: bold;
+margin-top: -5px;
+}
+
+#subAbout {
+font-size: 20px;
+padding: 16 16px;
+}
+
+.footer {
+width: 100%;
+background-color: #0d1b2a;
+color: #ffffff;
+text-align: center;
+padding: 1rem 0;
+font-size: 0.9rem;
+margin-top: 100px;
+}
