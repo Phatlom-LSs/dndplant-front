@@ -18,24 +18,24 @@ body {
   box-shadow: 0 0 40px rgba(8, 7, 16, 0.655);
   display: flex;
   align-items: center;
-  padding: 16px 16px;
+  padding: min(16px, 8%);
   gap: 20px;
 }
 
 .InET_logo {
   margin-right: 20px;
   position: relative;
-  left: 1000px;
+  left: min(1000px);
 }
 
 .CIT_logo {
   margin-right: 20px;
   position: relative;
-  left: 640px;
+  left: min(640px);
 }
 
 .site-title {
-  font-size: 30px;
+  font-size: clamp(1rem, calc(1vw + 1rem), 5rem);
   font-weight: bold;
   padding: 16 16px;
   left: -160px;
@@ -90,9 +90,8 @@ transform: translateY(2px);
 
 .about {
 max-width: 50%;
-position: relative;
-right: -120px;
-top: 20px;
+margin: auto;
+display: 'flex';
 background-color: rgba(255,255,255,0.13);
 background-color: rgb(61, 58, 58);
 border-radius: 10px;
@@ -124,4 +123,15 @@ text-align: center;
 padding: 1rem 0;
 font-size: 0.9rem;
 margin-top: 100px;
+position: fixed;
+left: 0;
+bottom: 0;
+}
+
+.container {
+background-color: #ffffff;
+width: 95vmin;
+min-width: 30em;
+transform: translate(-50%, -50%);
+max-height: 100%;
 }

@@ -60,7 +60,7 @@ export const navigationCustomizations = {
     defaultProps: {
       IconComponent: React.forwardRef((props, ref) => (
         <UnfoldMoreRoundedIcon fontSize="small" {...props} ref={ref} />
-      )).displayName = "MyIcon",
+      )),
     },
     styleOverrides: {
       root: ({ theme }) => ({

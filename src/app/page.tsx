@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 export default function HomePage() {
   const router = useRouter();
@@ -12,6 +13,23 @@ export default function HomePage() {
   return (
     <div>
       <main>
+        <header className="header">
+              <Image
+                  src="/assets/images/383346931_7060143100662598_4887970724141003749_n.png"
+                  alt="InET_logo"
+                  width={100}
+                  height={100}
+                  className="InET_logo"
+              />
+              <h1 className="site-title">Interactive Plant Design</h1>
+              <Image
+                  src="/assets/images/College of Industrial Technology_Brand book_FINAL-21.png"
+                  alt="CIT_logo"
+                  width={200}
+                  height={100}
+                  className="CIT_logo"
+              />
+        </header>
         <button className='button' onClick={goToLogin}>Sign In</button>  
 
         {/* About Section */}
