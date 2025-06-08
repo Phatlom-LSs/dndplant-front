@@ -159,7 +159,7 @@ export default function SignIn() {
                 id="email"
                 type="email"
                 name="email"
-                placeholder="your@email.com"
+                placeholder="sรหัสนักศึกษา@email.kmutnb.ac.th"
                 autoComplete="email"
                 autoFocus
                 required

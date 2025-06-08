@@ -2,20 +2,19 @@
 import React, { useState } from "react";
 import { DndContext, useDraggable, useDroppable } from "@dnd-kit/core";
 
-// --- CONFIG ---
-const CANVAS_SIZE = 900; // px, ปรับตามต้องการ
+const CANVAS_SIZE = 900;
 
-function getMeter(gridSize: number) {
+function getMeter(gridSize) {
   return CANVAS_SIZE / gridSize;
 }
 
-function DraggableDepartment({ dept }: { dept: any }) {
+function DraggableDepartment({ dept }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: dept.id,
   });
 
-  const style = {
-    position: "absolute" as const,
+  const style: React.CSSProperties = {
+    position: "absolute",
     top: dept.y * getMeter(dept.gridSize),
     left: dept.x * getMeter(dept.gridSize),
     width: dept.width * getMeter(dept.gridSize),
@@ -24,7 +23,7 @@ function DraggableDepartment({ dept }: { dept: any }) {
     boxShadow: "0 4px 16px 0 rgb(0 0 0 / 0.18)",
     borderRadius: "0.6rem",
     color: "#002b5c",
-    fontWeight: "bold" as const,
+    fontWeight: "bold",
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
     cursor: "grab",
     zIndex: 2,
@@ -44,20 +43,10 @@ function DraggableDepartment({ dept }: { dept: any }) {
   );
 }
 
-function GridArea({
-  layout,
-  setLayout,
-  gridSize,
-  onLayoutChange,
-}: {
-  layout: any[];
-  setLayout: (l: any[]) => void;
-  gridSize: number;
-  onLayoutChange: (next: any[]) => void;
-}) {
+function GridArea({ layout, setLayout, gridSize, onLayoutChange }) {
   const { setNodeRef } = useDroppable({ id: "layout" });
 
-  function handleDragEnd(event: any) {
+  function handleDragEnd(event) {
     const { active, delta } = event;
     const deptIndex = layout.findIndex((d) => d.id === active.id);
     if (deptIndex === -1) return;
@@ -75,10 +64,9 @@ function GridArea({
     const newLayout = [...layout];
     newLayout[deptIndex] = { ...moved, x: boundedX, y: boundedY };
     setLayout(newLayout);
-    onLayoutChange(newLayout); // Sync to backend ทุกครั้งที่ drag
+    onLayoutChange(newLayout);
   }
 
-  // grid background, fade effect
   const gridColor = "rgba(220,227,240,0.18)";
   const mainBorderColor = "rgba(255,255,255,0.08)";
 
@@ -102,7 +90,6 @@ function GridArea({
           borderRadius: "1.5rem",
         }}
       >
-        {/* fade layer */}
         <div
           style={{
             pointerEvents: "none",
@@ -116,7 +103,6 @@ function GridArea({
         {layout.map((dept) => (
           <DraggableDepartment key={dept.id} dept={dept} />
         ))}
-        {/* hint */}
         {layout.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
             <div className="rounded-lg px-8 py-4 text-center bg-white/20 text-white/90 text-xl font-bold shadow">
@@ -129,14 +115,14 @@ function GridArea({
   );
 }
 
-function AddDepartmentForm({ onAdd, layout, onDelete, gridSize }: { onAdd: (dept: any) => void; layout: any[]; onDelete: (id: string) => void; gridSize: number }) {
+function AddDepartmentForm({ onAdd, layout, onDelete, gridSize }) {
   const [name, setName] = useState("");
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
   const [x, setX] = useState("");
   const [y, setY] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (!name || !width || !height || !x || !y) return alert("กรุณากรอกข้อมูลให้ครบ");
 
@@ -243,7 +229,7 @@ function AddDepartmentForm({ onAdd, layout, onDelete, gridSize }: { onAdd: (dept
   );
 }
 
-function DepartmentList({ layout, onDelete }: { layout: any[]; onDelete: (id: string) => void }) {
+function DepartmentList({ layout, onDelete }) {
   return (
     <div>
       <div className="font-semibold text-[#f0f6fc] mb-2 mt-4">แผนก</div>
@@ -272,41 +258,66 @@ function DepartmentList({ layout, onDelete }: { layout: any[]; onDelete: (id: st
   );
 }
 
+function handleLogout() {
+  if (typeof window !== "undefined") {
+    window.location.href = "/login";
+  }
+}
 
 export default function PlantLayout() {
-  const [layout, setLayout] = useState<any[]>([]);
+  const [layout, setLayout] = useState([]);
   const [gridSize, setGridSize] = useState(30);
   const [zoom, setZoom] = useState(1);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  async function syncLayoutToBackend(nextLayout: any[]) {
+  async function syncLayoutToBackend(nextLayout) {
     try {
       await fetch('/api/plant-layout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nextLayout),
       });
-    } catch (err) {
-      console.error("Sync layout failed:", err);
-    }
+    } catch {}
   }
 
-  const handleAddDept = (newDept: any) => {
+  const handleAddDept = (newDept) => {
     const next = [...layout, newDept];
     setLayout(next);
     syncLayoutToBackend(next);
   };
-  const handleDeleteDept = (id: string) => {
+  const handleDeleteDept = (id) => {
     const next = layout.filter((d) => d.id !== id);
     setLayout(next);
     syncLayoutToBackend(next);
   };
 
-  const handleWheel = (e: React.WheelEvent) => {
+  const handleWheel = (e) => {
     if (e.ctrlKey) {
       e.preventDefault();
       setZoom(z => Math.min(3, Math.max(0.5, z - e.deltaY * 0.001)));
     }
   };
+
+  async function handleSubmitLayout(layout) {
+    setLoading(true);
+    setResult(null);
+    try {
+      await fetch("/api/submit-layout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(layout),
+      });
+      // ดึงผลลัพธ์หลัง submit ทันที
+      const res = await fetch("/api/plant-layout/result");
+      const data = await res.json();
+      setResult(data);
+      setLoading(false);
+    } catch {
+      alert("ส่ง layout หรือดึงผลลัพธ์ไม่สำเร็จ");
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#001d3d]">
@@ -325,7 +336,24 @@ export default function PlantLayout() {
           </div>
         </div>
       </div>
-      <div className="w-full max-w-[390px] min-w-[310px] h-full px-5 py-7 bg-white/20 backdrop-blur-md border-l border-white/30 shadow-2xl flex flex-col gap-7">
+      <div className="w-full max-w-[390px] min-w-[310px] h-full px-5 py-7 bg-white/20 backdrop-blur-md border-l border-white/30 shadow-2xl flex flex-col gap-6">
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={handleLogout}
+            className="bg-gradient-to-r from-blue-600 to-green-400 text-white font-bold px-4 py-2 rounded-lg shadow hover:scale-[1.04] transition"
+            title="Logout"
+          >
+            Logout
+          </button>
+          <button
+            onClick={() => handleSubmitLayout(layout)}
+            className="bg-gradient-to-r from-green-400 to-blue-500 text-white font-bold px-4 py-2 rounded-lg shadow hover:scale-[1.04] transition"
+            title="Submit Layout"
+            disabled={loading}
+          >
+            {loading ? "Loading..." : "Submit Layout"}
+          </button>
+        </div>
         <div>
           <h1 className="text-2xl font-extrabold text-[#f0f6fc] tracking-wide mb-3">Plant Design</h1>
           <div className="mb-6">
@@ -341,6 +369,28 @@ export default function PlantLayout() {
           </div>
           <div className="border-b border-white/30 my-2" />
         </div>
+
+        {/* ส่วนแสดงผลลัพธ์ */}
+        <div>
+          <div className="font-bold text-[#e0f2fe] mb-2">CRAFT Result</div>
+          {loading && <div className="text-white/80 mb-2">Loading result...</div>}
+          {result ? (
+            <div className="bg-white/10 rounded-lg p-3 text-white space-y-1">
+              <div>Total Cost: {result.totalCost}</div>
+              <div>Total Distance: {result.totalDistance}</div>
+              {/* โชว์ field อื่นเพิ่มได้ตามที่ backend ส่งคืน */}
+              <div>
+                Assignment:{" "}
+                {result.assignment && result.assignment.map((d, i) =>
+                  <div key={i} className="ml-2">
+                    {d.name} ({d.x}, {d.y}) size {d.width}x{d.height}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : !loading && <div className="text-white/50">ยังไม่มีผลลัพธ์</div>}
+        </div>
+
         <AddDepartmentForm onAdd={handleAddDept} layout={layout} onDelete={handleDeleteDept} gridSize={gridSize} />
         <DepartmentList layout={layout} onDelete={handleDeleteDept} />
       </div>
