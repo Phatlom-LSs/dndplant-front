@@ -13,7 +13,7 @@ function DraggableDepartment({ dept }) {
     id: dept.id,
   });
 
-  const style: React.CSSProperties = {
+  const style = {
     position: "absolute",
     top: dept.y * getMeter(dept.gridSize),
     left: dept.x * getMeter(dept.gridSize),
@@ -258,6 +258,63 @@ function DepartmentList({ layout, onDelete }) {
   );
 }
 
+// ----------- Matrix Table Input -----------
+function FlowMatrixInput({ matrix, setMatrix, departmentNames }) {
+  const n = departmentNames.length;
+  // Ensure matrix shape
+  React.useEffect(() => {
+    if (matrix.length !== n) {
+      setMatrix(Array(n).fill().map((_, i) =>
+        Array(n).fill(0)
+      ));
+    }
+  }, [n]);
+
+  function handleChange(i, j, v) {
+    const newMatrix = matrix.map(row => [...row]);
+    newMatrix[i][j] = Number(v);
+    setMatrix(newMatrix);
+  }
+
+  if (n === 0) return null;
+  return (
+    <div className="my-2">
+      <div className="font-semibold text-[#f0f6fc] mb-2">Flow/Cost Matrix (ระหว่างแผนก)</div>
+      <div className="overflow-auto">
+        <table className="min-w-full border-collapse bg-white/10 text-xs text-[#e0f2fe]">
+          <thead>
+            <tr>
+              <th className="border px-2 py-1 bg-[#334155]">To/From</th>
+              {departmentNames.map((name, i) => (
+                <th className="border px-2 py-1 bg-[#334155]" key={i}>{name}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {departmentNames.map((from, i) => (
+              <tr key={i}>
+                <th className="border px-2 py-1 bg-[#334155]">{from}</th>
+                {departmentNames.map((to, j) => (
+                  <td className="border px-1 py-1" key={j}>
+                    <input
+                      type="number"
+                      min={0}
+                      value={matrix[i]?.[j] ?? 0}
+                      onChange={e => handleChange(i, j, e.target.value)}
+                      className="w-14 px-1 py-1 rounded text-[#0f172a] bg-white/80 text-center border"
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ----------- Main Page Component -----------
 function handleLogout() {
   if (typeof window !== "undefined") {
     window.location.href = "/login";
@@ -270,6 +327,25 @@ export default function PlantLayout() {
   const [zoom, setZoom] = useState(1);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // ----- flow matrix state -----
+  const [flowMatrix, setFlowMatrix] = useState([]);
+  const departmentNames = layout.map(d => d.name);
+
+  // ----- distance type -----
+  const [distanceType, setDistanceType] = useState("manhattan");
+
+  React.useEffect(() => {
+    // Sync matrix shape if departments change
+    setFlowMatrix(prev => {
+      if (prev.length !== layout.length) {
+        return Array(layout.length)
+          .fill(0)
+          .map((_, i) => Array(layout.length).fill(0));
+      }
+      return prev;
+    });
+  }, [layout.length]);
 
   async function syncLayoutToBackend(nextLayout) {
     try {
@@ -299,16 +375,24 @@ export default function PlantLayout() {
     }
   };
 
-  async function handleSubmitLayout(layout) {
+  async function handleSubmitLayout() {
     setLoading(true);
     setResult(null);
     try {
-      await fetch("/api/submit-layout", {
+      // เตรียม payload
+      const departments = layout.map(({ id, ...rest }) => rest);
+      const payload = {
+        departments,
+        flowMatrix,
+        distanceType
+      };
+
+      await fetch(`${process.env.local.CRAFT_CREATE_API}/layout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(layout),
+        body: JSON.stringify(payload),
       });
-      // ดึงผลลัพธ์หลัง submit ทันที
+
       const res = await fetch("/api/plant-layout/result");
       const data = await res.json();
       setResult(data);
@@ -336,7 +420,7 @@ export default function PlantLayout() {
           </div>
         </div>
       </div>
-      <div className="w-full max-w-[390px] min-w-[310px] h-full px-5 py-7 bg-white/20 backdrop-blur-md border-l border-white/30 shadow-2xl flex flex-col gap-6">
+      <div className="w-full max-w-[430px] min-w-[310px] h-full px-5 py-7 bg-white/20 backdrop-blur-md border-l border-white/30 shadow-2xl flex flex-col gap-6 overflow-y-auto">
         <div className="flex justify-end gap-2">
           <button
             onClick={handleLogout}
@@ -346,7 +430,7 @@ export default function PlantLayout() {
             Logout
           </button>
           <button
-            onClick={() => handleSubmitLayout(layout)}
+            onClick={handleSubmitLayout}
             className="bg-gradient-to-r from-green-400 to-blue-500 text-white font-bold px-4 py-2 rounded-lg shadow hover:scale-[1.04] transition"
             title="Submit Layout"
             disabled={loading}
@@ -370,7 +454,34 @@ export default function PlantLayout() {
           <div className="border-b border-white/30 my-2" />
         </div>
 
-        {/* ส่วนแสดงผลลัพธ์ */}
+        {/* Flow Matrix Input */}
+        <FlowMatrixInput matrix={flowMatrix} setMatrix={setFlowMatrix} departmentNames={departmentNames} />
+
+        {/* Distance Type Select */}
+        <div className="mb-3">
+          <div className="font-semibold text-[#f0f6fc] mb-1">ระยะทาง</div>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-1 text-[#e0f2fe] text-sm">
+              <input
+                type="radio"
+                name="distanceType"
+                value="manhattan"
+                checked={distanceType === "manhattan"}
+                onChange={() => setDistanceType("manhattan")}
+              /> Manhattan
+            </label>
+            <label className="flex items-center gap-1 text-[#e0f2fe] text-sm">
+              <input
+                type="radio"
+                name="distanceType"
+                value="euclidean"
+                checked={distanceType === "euclidean"}
+                onChange={() => setDistanceType("euclidean")}
+              /> Euclidean
+            </label>
+          </div>
+        </div>
+
         <div>
           <div className="font-bold text-[#e0f2fe] mb-2">CRAFT Result</div>
           {loading && <div className="text-white/80 mb-2">Loading result...</div>}
@@ -378,7 +489,6 @@ export default function PlantLayout() {
             <div className="bg-white/10 rounded-lg p-3 text-white space-y-1">
               <div>Total Cost: {result.totalCost}</div>
               <div>Total Distance: {result.totalDistance}</div>
-              {/* โชว์ field อื่นเพิ่มได้ตามที่ backend ส่งคืน */}
               <div>
                 Assignment:{" "}
                 {result.assignment && result.assignment.map((d, i) =>
