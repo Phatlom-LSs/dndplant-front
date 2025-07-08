@@ -10,6 +10,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
     matcher: [
-        'math/:path*',
+        'main/:path*',
     ]
 }
