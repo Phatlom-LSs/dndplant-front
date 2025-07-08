@@ -14,7 +14,7 @@ function DraggableDepartment({ dept }) {
   });
 
   const style = {
-    position: "absolute",
+    position: "absolute" as const,
     top: dept.y * getMeter(dept.gridSize),
     left: dept.x * getMeter(dept.gridSize),
     width: dept.width * getMeter(dept.gridSize),
@@ -275,7 +275,7 @@ function FlowMatrixInput({ matrix, setMatrix, departmentNames }) {
     if (matrix.length !== n) {
       setMatrix(
         Array(n)
-          .fill()
+          .fill(0)
           .map((_, i) => Array(n).fill(0))
       );
     }
@@ -368,7 +368,7 @@ export default function PlantLayout() {
 
   async function syncLayoutToBackend(nextLayout) {
     try {
-      await fetch("/api/plant-layout", {
+      await fetch(`${process.env.CRAFT_CREATE_API}/layout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(nextLayout),
@@ -409,13 +409,13 @@ export default function PlantLayout() {
         metric: distanceType,
       };
 
-      await fetch("/api/submit-layout", {
+      await fetch(`${process.env.CRAFT_CREATE_API}/layout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-      const res = await fetch("/api/plant-layout/result");
+      const res = await fetch(`${process.env.CRAFT_CREATE_API}/result?layoutId=${layout}`);
       const data = await res.json();
       setResult(data);
       setLoading(false);
