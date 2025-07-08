@@ -24,10 +24,12 @@ function DraggableDepartment({ dept }) {
     borderRadius: "0.6rem",
     color: "#002b5c",
     fontWeight: "bold",
-    transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
+    transform: transform
+      ? `translate(${transform.x}px, ${transform.y}px)`
+      : undefined,
     cursor: "grab",
     zIndex: 2,
-    border: "2px solid #1e293b"
+    border: "2px solid #1e293b",
   };
 
   return (
@@ -96,7 +98,8 @@ function GridArea({ layout, setLayout, gridSize, onLayoutChange }) {
             position: "absolute",
             inset: 0,
             borderRadius: "1.5rem",
-            background: "linear-gradient(135deg,rgba(0,0,0,0.05) 30%,rgba(255,255,255,0.06) 100%)",
+            background:
+              "linear-gradient(135deg,rgba(0,0,0,0.05) 30%,rgba(255,255,255,0.06) 100%)",
             zIndex: 1,
           }}
         />
@@ -124,7 +127,8 @@ function AddDepartmentForm({ onAdd, layout, onDelete, gridSize }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!name || !width || !height || !x || !y) return alert("กรุณากรอกข้อมูลให้ครบ");
+    if (!name || !width || !height || !x || !y)
+      return alert("กรุณากรอกข้อมูลให้ครบ");
 
     const widthNum = Number(width);
     const heightNum = Number(height);
@@ -158,7 +162,9 @@ function AddDepartmentForm({ onAdd, layout, onDelete, gridSize }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium mb-1 text-[#f0f6fc]">ชื่อแผนก</label>
+        <label className="block text-sm font-medium mb-1 text-[#f0f6fc]">
+          ชื่อแผนก
+        </label>
         <input
           type="text"
           value={name}
@@ -239,7 +245,10 @@ function DepartmentList({ layout, onDelete }) {
         ) : (
           <ul className="space-y-1">
             {layout.map((dept) => (
-              <li key={dept.id} className="flex justify-between items-center py-1 px-1 rounded hover:bg-white/30 transition">
+              <li
+                key={dept.id}
+                className="flex justify-between items-center py-1 px-1 rounded hover:bg-white/30 transition"
+              >
                 <span className="font-medium text-[#e0f2fe]">{dept.name}</span>
                 <button
                   onClick={() => onDelete(dept.id)}
@@ -264,14 +273,16 @@ function FlowMatrixInput({ matrix, setMatrix, departmentNames }) {
   // Ensure matrix shape
   React.useEffect(() => {
     if (matrix.length !== n) {
-      setMatrix(Array(n).fill().map((_, i) =>
-        Array(n).fill(0)
-      ));
+      setMatrix(
+        Array(n)
+          .fill()
+          .map((_, i) => Array(n).fill(0))
+      );
     }
   }, [n]);
 
   function handleChange(i, j, v) {
-    const newMatrix = matrix.map(row => [...row]);
+    const newMatrix = matrix.map((row) => [...row]);
     newMatrix[i][j] = Number(v);
     setMatrix(newMatrix);
   }
@@ -279,14 +290,18 @@ function FlowMatrixInput({ matrix, setMatrix, departmentNames }) {
   if (n === 0) return null;
   return (
     <div className="my-2">
-      <div className="font-semibold text-[#f0f6fc] mb-2">Flow/Cost Matrix (ระหว่างแผนก)</div>
+      <div className="font-semibold text-[#f0f6fc] mb-2">
+        Flow/Cost Matrix (ระหว่างแผนก)
+      </div>
       <div className="overflow-auto">
         <table className="min-w-full border-collapse bg-white/10 text-xs text-[#e0f2fe]">
           <thead>
             <tr>
               <th className="border px-2 py-1 bg-[#334155]">To/From</th>
               {departmentNames.map((name, i) => (
-                <th className="border px-2 py-1 bg-[#334155]" key={i}>{name}</th>
+                <th className="border px-2 py-1 bg-[#334155]" key={i}>
+                  {name}
+                </th>
               ))}
             </tr>
           </thead>
@@ -300,7 +315,7 @@ function FlowMatrixInput({ matrix, setMatrix, departmentNames }) {
                       type="number"
                       min={0}
                       value={matrix[i]?.[j] ?? 0}
-                      onChange={e => handleChange(i, j, e.target.value)}
+                      onChange={(e) => handleChange(i, j, e.target.value)}
                       className="w-14 px-1 py-1 rounded text-[#0f172a] bg-white/80 text-center border"
                     />
                   </td>
@@ -328,16 +343,20 @@ export default function PlantLayout() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // new: layoutName/projectId
+  const [layoutName, setLayoutName] = useState("");
+  const [projectId, setProjectId] = useState(""); // กรอกเองก่อน, หรือ hardcode id
+
   // ----- flow matrix state -----
   const [flowMatrix, setFlowMatrix] = useState([]);
-  const departmentNames = layout.map(d => d.name);
+  const departmentNames = layout.map((d) => d.name);
 
   // ----- distance type -----
   const [distanceType, setDistanceType] = useState("manhattan");
 
   React.useEffect(() => {
     // Sync matrix shape if departments change
-    setFlowMatrix(prev => {
+    setFlowMatrix((prev) => {
       if (prev.length !== layout.length) {
         return Array(layout.length)
           .fill(0)
@@ -349,9 +368,9 @@ export default function PlantLayout() {
 
   async function syncLayoutToBackend(nextLayout) {
     try {
-      await fetch('/api/plant-layout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      await fetch("/api/plant-layout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(nextLayout),
       });
     } catch {}
@@ -371,7 +390,7 @@ export default function PlantLayout() {
   const handleWheel = (e) => {
     if (e.ctrlKey) {
       e.preventDefault();
-      setZoom(z => Math.min(3, Math.max(0.5, z - e.deltaY * 0.001)));
+      setZoom((z) => Math.min(3, Math.max(0.5, z - e.deltaY * 0.001)));
     }
   };
 
@@ -379,15 +398,18 @@ export default function PlantLayout() {
     setLoading(true);
     setResult(null);
     try {
-      // เตรียม payload
-      const departments = layout.map(({ id, ...rest }) => rest);
+      // เตรียม payload ตรงกับ DTO
+      const departments = layout.map(({ id, gridSize, ...rest }) => rest);
       const payload = {
+        name: layoutName,
+        gridSize,
+        projectId,
         departments,
-        flowMatrix,
-        distanceType
+        costMatrix: flowMatrix,
+        metric: distanceType,
       };
 
-      await fetch(`${process.env.local.CRAFT_CREATE_API}/layout`, {
+      await fetch("/api/submit-layout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -405,12 +427,22 @@ export default function PlantLayout() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#001d3d]">
-      <div className="flex-1 flex items-center justify-center overflow-auto bg-[#002b5c]" onWheel={handleWheel}>
+      <div
+        className="flex-1 flex items-center justify-center overflow-auto bg-[#002b5c]"
+        onWheel={handleWheel}
+      >
         <div
           className="flex items-center justify-center w-full h-full"
           style={{ minHeight: CANVAS_SIZE, minWidth: CANVAS_SIZE }}
         >
-          <div style={{ width: CANVAS_SIZE, height: CANVAS_SIZE, transform: `scale(${zoom})`, transformOrigin: '0 0' }}>
+          <div
+            style={{
+              width: CANVAS_SIZE,
+              height: CANVAS_SIZE,
+              transform: `scale(${zoom})`,
+              transformOrigin: "0 0",
+            }}
+          >
             <GridArea
               layout={layout}
               setLayout={setLayout}
@@ -438,24 +470,55 @@ export default function PlantLayout() {
             {loading ? "Loading..." : "Submit Layout"}
           </button>
         </div>
-        <div>
-          <h1 className="text-2xl font-extrabold text-[#f0f6fc] tracking-wide mb-3">Plant Design</h1>
-          <div className="mb-6">
-            <label className="block mb-1 font-semibold text-[#f0f6fc]">ขนาดกริด (เมตร):</label>
-            <input
-              type="number"
-              min={5}
-              max={100}
-              value={gridSize}
-              onChange={(e) => setGridSize(Number(e.target.value))}
-              className="w-full border px-2 py-1 rounded shadow-inner bg-white/70 text-[#002b5c] font-semibold"
-            />
-          </div>
-          <div className="border-b border-white/30 my-2" />
+
+        {/* เพิ่ม input กรอกชื่อ layout / project */}
+        <div className="mb-2">
+          <label className="block mb-1 font-semibold text-[#f0f6fc]">
+            Layout Name
+          </label>
+          <input
+            type="text"
+            value={layoutName}
+            onChange={(e) => setLayoutName(e.target.value)}
+            placeholder="Layout Name"
+            className="w-full border px-2 py-1 rounded shadow-inner bg-white/70 text-[#002b5c] font-semibold mb-2"
+          />
+        </div>
+        <div className="mb-4">
+          <label className="block mb-1 font-semibold text-[#f0f6fc]">
+            Project ID
+          </label>
+          <input
+            type="text"
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+            placeholder="Project ID"
+            className="w-full border px-2 py-1 rounded shadow-inner bg-white/70 text-[#002b5c] font-semibold mb-2"
+          />
         </div>
 
+        <div>
+          <label className="block mb-1 font-semibold text-[#f0f6fc]">
+            ขนาดกริด (เมตร):
+          </label>
+          <input
+            type="number"
+            min={5}
+            max={100}
+            value={gridSize}
+            onChange={(e) => setGridSize(Number(e.target.value))}
+            className="w-full border px-2 py-1 rounded shadow-inner bg-white/70 text-[#002b5c] font-semibold"
+          />
+        </div>
+
+        <div className="border-b border-white/30 my-2" />
+
         {/* Flow Matrix Input */}
-        <FlowMatrixInput matrix={flowMatrix} setMatrix={setFlowMatrix} departmentNames={departmentNames} />
+        <FlowMatrixInput
+          matrix={flowMatrix}
+          setMatrix={setFlowMatrix}
+          departmentNames={departmentNames}
+        />
 
         {/* Distance Type Select */}
         <div className="mb-3">
@@ -468,7 +531,8 @@ export default function PlantLayout() {
                 value="manhattan"
                 checked={distanceType === "manhattan"}
                 onChange={() => setDistanceType("manhattan")}
-              /> Manhattan
+              />{" "}
+              Manhattan
             </label>
             <label className="flex items-center gap-1 text-[#e0f2fe] text-sm">
               <input
@@ -477,31 +541,42 @@ export default function PlantLayout() {
                 value="euclidean"
                 checked={distanceType === "euclidean"}
                 onChange={() => setDistanceType("euclidean")}
-              /> Euclidean
+              />{" "}
+              Euclidean
             </label>
           </div>
         </div>
 
         <div>
           <div className="font-bold text-[#e0f2fe] mb-2">CRAFT Result</div>
-          {loading && <div className="text-white/80 mb-2">Loading result...</div>}
+          {loading && (
+            <div className="text-white/80 mb-2">Loading result...</div>
+          )}
           {result ? (
             <div className="bg-white/10 rounded-lg p-3 text-white space-y-1">
               <div>Total Cost: {result.totalCost}</div>
               <div>Total Distance: {result.totalDistance}</div>
               <div>
                 Assignment:{" "}
-                {result.assignment && result.assignment.map((d, i) =>
-                  <div key={i} className="ml-2">
-                    {d.name} ({d.x}, {d.y}) size {d.width}x{d.height}
-                  </div>
-                )}
+                {result.assignment &&
+                  result.assignment.map((d, i) => (
+                    <div key={i} className="ml-2">
+                      {d.name} ({d.x}, {d.y}) size {d.width}x{d.height}
+                    </div>
+                  ))}
               </div>
             </div>
-          ) : !loading && <div className="text-white/50">ยังไม่มีผลลัพธ์</div>}
+          ) : (
+            !loading && <div className="text-white/50">ยังไม่มีผลลัพธ์</div>
+          )}
         </div>
 
-        <AddDepartmentForm onAdd={handleAddDept} layout={layout} onDelete={handleDeleteDept} gridSize={gridSize} />
+        <AddDepartmentForm
+          onAdd={handleAddDept}
+          layout={layout}
+          onDelete={handleDeleteDept}
+          gridSize={gridSize}
+        />
         <DepartmentList layout={layout} onDelete={handleDeleteDept} />
       </div>
     </div>
