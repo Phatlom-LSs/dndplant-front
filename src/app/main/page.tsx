@@ -17,7 +17,7 @@ function DraggableDepartment({ dept }) {
     id: dept.id,
   });
   const style = {
-    position: "absolute",
+    position: "absolute" as const,
     top: dept.y * getMeter(dept.gridSize),
     left: dept.x * getMeter(dept.gridSize),
     width: dept.width * getMeter(dept.gridSize),
