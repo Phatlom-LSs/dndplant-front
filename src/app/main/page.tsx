@@ -2,20 +2,17 @@
 import React, { useState } from "react";
 import { DndContext, useDraggable, useDroppable } from "@dnd-kit/core";
 
-// ------- config -------
 const CANVAS_SIZE = 900;
-const API_BASE = process.env.CRAFT_CREATE_API || 'http://localhost:4000';
+const API_BASE = process.env.NEXT_PUBLIC_CRAFT_CREATE_API
 
-// ------- utilities -------
+// ----------- Utils -----------
 function getMeter(gridSize) {
   return CANVAS_SIZE / gridSize;
 }
 
-// ------- drag component -------
+// ----------- DraggableDepartment -----------
 function DraggableDepartment({ dept }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: dept.id,
-  });
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: dept.id });
   const style = {
     position: "absolute" as const,
     top: dept.y * getMeter(dept.gridSize),
@@ -45,6 +42,7 @@ function DraggableDepartment({ dept }) {
   );
 }
 
+// ----------- GridArea -----------
 function GridArea({ layout, setLayout, gridSize, onLayoutChange }) {
   const { setNodeRef } = useDroppable({ id: "layout" });
   function handleDragEnd(event) {
@@ -92,8 +90,7 @@ function GridArea({ layout, setLayout, gridSize, onLayoutChange }) {
             position: "absolute",
             inset: 0,
             borderRadius: "1.5rem",
-            background:
-              "linear-gradient(135deg,rgba(0,0,0,0.05) 30%,rgba(255,255,255,0.06) 100%)",
+            background: "linear-gradient(135deg,rgba(0,0,0,0.05) 30%,rgba(255,255,255,0.06) 100%)",
             zIndex: 1,
           }}
         />
@@ -112,7 +109,7 @@ function GridArea({ layout, setLayout, gridSize, onLayoutChange }) {
   );
 }
 
-// ------- department add form -------
+// ----------- AddDepartmentForm -----------
 function AddDepartmentForm({ onAdd, layout, onDelete, gridSize }) {
   const [name, setName] = useState("");
   const [width, setWidth] = useState("");
@@ -173,6 +170,7 @@ function AddDepartmentForm({ onAdd, layout, onDelete, gridSize }) {
   );
 }
 
+// ----------- DepartmentList -----------
 function DepartmentList({ layout, onDelete }) {
   return (
     <div>
@@ -195,6 +193,7 @@ function DepartmentList({ layout, onDelete }) {
   );
 }
 
+// ----------- FlowMatrixInput -----------
 function FlowMatrixInput({ matrix, setMatrix, departmentNames }) {
   const n = departmentNames.length;
   React.useEffect(() => {
@@ -247,22 +246,21 @@ function FlowMatrixInput({ matrix, setMatrix, departmentNames }) {
   );
 }
 
-// ---------- NEW: Modal สร้าง Project ----------
+// ----------- ProjectModal -----------
 function ProjectModal({ open, onSubmit }) {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   async function handleCreate() {
     if (!name) return alert("กรุณากรอกชื่อโปรเจกต์");
     setLoading(true);
-    // TODO: ให้ userId จริงจาก session/auth
-    const userId = 1;
+    const userId = 1; // สมมติ user id
     const res = await fetch(`${API_BASE}/craft/project`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, userId }),
     });
     const data = await res.json();
-    onSubmit(data.id); // สมมติคืน { id, name }
+    onSubmit(data.id); // backend ต้องคืน { id }
     setLoading(false);
   }
   if (!open) return null;
@@ -288,7 +286,7 @@ function ProjectModal({ open, onSubmit }) {
   );
 }
 
-// ----------- Main Page Component -----------
+// ----------- Main PlantLayout Component -----------
 export default function PlantLayout() {
   const [layout, setLayout] = useState([]);
   const [gridSize, setGridSize] = useState(30);
@@ -317,28 +315,6 @@ export default function PlantLayout() {
     });
   }, [layout.length]);
 
-  async function syncLayoutToBackend(nextLayout) {
-    // Optionally sync if you want
-  }
-
-  const handleAddDept = (newDept) => {
-    const next = [...layout, newDept];
-    setLayout(next);
-    syncLayoutToBackend(next);
-  };
-  const handleDeleteDept = (id) => {
-    const next = layout.filter((d) => d.id !== id);
-    setLayout(next);
-    syncLayoutToBackend(next);
-  };
-
-  const handleWheel = (e) => {
-    if (e.ctrlKey) {
-      e.preventDefault();
-      setZoom((z) => Math.min(3, Math.max(0.5, z - e.deltaY * 0.001)));
-    }
-  };
-
   async function handleSubmitLayout() {
     setLoading(true);
     setResult(null);
@@ -357,18 +333,24 @@ export default function PlantLayout() {
         costMatrix: flowMatrix,
         metric: distanceType,
       };
-      await fetch(`${API_BASE}/craft/layout`, {
+      // POST layout
+      const createRes = await fetch(`${API_BASE}/craft/layout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
-      // option: fetch result by layoutId ล่าสุด
-      // สมมติ backend คืน layoutId กลับมา จะ get ด้วย layoutId
-      // const res = await fetch(`${API_BASE}/craftLayout/result?layoutId=xxxx`);
-      // const data = await res.json();
-      // setResult(data);
-
+      const createData = await createRes.json();
+      // ดึง layoutId จาก backend
+      const layoutId = createData.layoutId || createData.id || createData?.result?.layoutId;
+      if (!layoutId) {
+        alert("Backend ไม่คืน layoutId กรุณาตรวจสอบ backend");
+        setLoading(false);
+        return;
+      }
+      // GET CRAFT result
+      const res = await fetch(`${API_BASE}/craftLayout/result?layoutId=${layoutId}`);
+      const data = await res.json();
+      setResult(data);
       setLoading(false);
     } catch (err) {
       alert("ส่ง layout หรือดึงผลลัพธ์ไม่สำเร็จ");
@@ -385,31 +367,29 @@ export default function PlantLayout() {
     window.location.href = "/login";
   }
 
+  function handleWheel(e) {
+    if (e.ctrlKey) {
+      e.preventDefault();
+      setZoom((z) => Math.min(3, Math.max(0.5, z - e.deltaY * 0.001)));
+    }
+  }
+
+  const handleAddDept = (newDept) => {
+    const next = [...layout, newDept];
+    setLayout(next);
+  };
+  const handleDeleteDept = (id) => {
+    const next = layout.filter((d) => d.id !== id);
+    setLayout(next);
+  };
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#001d3d]">
       <ProjectModal open={showProjectModal} onSubmit={handleProjectCreated} />
-      <div
-        className="flex-1 flex items-center justify-center overflow-auto bg-[#002b5c]"
-        onWheel={handleWheel}
-      >
-        <div
-          className="flex items-center justify-center w-full h-full"
-          style={{ minHeight: CANVAS_SIZE, minWidth: CANVAS_SIZE }}
-        >
-          <div
-            style={{
-              width: CANVAS_SIZE,
-              height: CANVAS_SIZE,
-              transform: `scale(${zoom})`,
-              transformOrigin: "0 0",
-            }}
-          >
-            <GridArea
-              layout={layout}
-              setLayout={setLayout}
-              gridSize={gridSize}
-              onLayoutChange={syncLayoutToBackend}
-            />
+      <div className="flex-1 flex items-center justify-center overflow-auto bg-[#002b5c]" onWheel={handleWheel}>
+        <div className="flex items-center justify-center w-full h-full" style={{ minHeight: CANVAS_SIZE, minWidth: CANVAS_SIZE }}>
+          <div style={{ width: CANVAS_SIZE, height: CANVAS_SIZE, transform: `scale(${zoom})`, transformOrigin: "0 0" }}>
+            <GridArea layout={layout} setLayout={setLayout} gridSize={gridSize} onLayoutChange={() => {}} />
           </div>
         </div>
       </div>
