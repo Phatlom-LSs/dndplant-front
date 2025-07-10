@@ -340,6 +340,7 @@ export default function PlantLayout() {
         body: JSON.stringify(payload),
       });
       const createData = await createRes.json();
+      console.log('createData:', createData)
       // ดึง layoutId จาก backend
       const layoutId = createData.layoutId || createData.id || createData?.result?.layoutId;
       if (!layoutId) {
