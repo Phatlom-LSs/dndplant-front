@@ -349,7 +349,7 @@ export default function PlantLayout() {
         return;
       }
       // GET CRAFT result
-      const res = await fetch(`${API_BASE}/craftLayout/result?layoutId=${layoutId}`);
+      const res = await fetch(`${API_BASE}/craft/result?layoutId=${layoutId}`);
       const data = await res.json();
       console.log("Result data from API:", data);
       setResult(data);
