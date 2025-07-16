@@ -351,6 +351,7 @@ export default function PlantLayout() {
       // GET CRAFT result
       const res = await fetch(`${API_BASE}/craftLayout/result?layoutId=${layoutId}`);
       const data = await res.json();
+      console.log("Result data from API:", data);
       setResult(data);
       setLoading(false);
     } catch (err) {
