@@ -353,6 +353,15 @@ export default function PlantLayout() {
       const data = await res.json();
       console.log("Result data from API:", data);
       setResult(data);
+
+      if (data.assignment && Array.isArray(data.assignment)) {
+        const layoutWithGrid = data.assignment.map(dep => ({
+          ...dep,
+          gridSize,
+        }));
+        setLayout(layoutWithGrid);
+      }
+
       setLoading(false);
     } catch (err) {
       alert("ส่ง layout หรือดึงผลลัพธ์ไม่สำเร็จ");
