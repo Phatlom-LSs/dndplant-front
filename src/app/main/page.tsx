@@ -324,7 +324,14 @@ export default function PlantLayout() {
         setLoading(false);
         return;
       }
-      const departments = layout.map(({ id, gridSize, ...rest }) => rest);
+      const minX = Math.min(...layout.map(d => d.x))
+      const minY = Math.min(...layout.map(d => d.y))
+
+      const departments = layout.map(({ id, gridSize, ...rest }) => ({
+        ...rest,
+        x: rest.x - minX,
+        y: rest.y - minY,
+      }));
       const payload = {
         name: layoutName,
         gridSize,
