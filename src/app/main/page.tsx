@@ -95,7 +95,7 @@ function GridArea({ layout, setLayout, gridSize, onLayoutChange }) {
           }}
         />
         {layout.map((dept) => (
-          <DraggableDepartment key={dept.id} dept={dept} />
+          <DraggableDepartment key={dept.name + '-' + dept.x + '-' + dept.y} dept={dept} />
         ))}
         {layout.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
