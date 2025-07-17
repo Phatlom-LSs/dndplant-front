@@ -341,6 +341,7 @@ export default function PlantLayout() {
         metric: distanceType,
       };
       // POST layout
+      console.log('API Data Send: ', payload);
       const createRes = await fetch(`${API_BASE}/craft/layout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
