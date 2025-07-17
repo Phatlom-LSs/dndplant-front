@@ -365,6 +365,7 @@ export default function PlantLayout() {
         const layoutWithGrid = data.assignment.map(dep => ({
           ...dep,
           gridSize,
+          id: dep.id || dep.name,
         }));
         setLayout(layoutWithGrid);
       }
