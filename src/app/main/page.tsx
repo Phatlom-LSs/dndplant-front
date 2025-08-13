@@ -3,22 +3,30 @@ import React, { useState } from "react";
 import { DndContext, useDraggable, useDroppable } from "@dnd-kit/core";
 
 const CANVAS_SIZE = 900;
-const API_BASE = process.env.NEXT_PUBLIC_CRAFT_CREATE_API;
+const API_BASE = process.env.NEXT_PUBLIC_CRAFT_CREATE_API as string;
 
-// ----------- Utils -----------
+type Dept = {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  gridSize?: number;
+};
+
 function getMeter(gridSize: number) {
   return CANVAS_SIZE / gridSize;
 }
 
-// ----------- DraggableDepartment -----------
-function DraggableDepartment({ dept }: { dept: any }) {
+function DraggableDepartment({ dept }: { dept: Dept }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: dept.id });
-  const style = {
-    position: "absolute" as const,
-    top: dept.y * getMeter(dept.gridSize),
-    left: dept.x * getMeter(dept.gridSize),
-    width: dept.width * getMeter(dept.gridSize),
-    height: dept.height * getMeter(dept.gridSize),
+  const style: React.CSSProperties = {
+    position: "absolute",
+    top: dept.y * getMeter(dept.gridSize ?? 1),
+    left: dept.x * getMeter(dept.gridSize ?? 1),
+    width: dept.width * getMeter(dept.gridSize ?? 1),
+    height: dept.height * getMeter(dept.gridSize ?? 1),
     background: "linear-gradient(135deg, #4ade80 80%, #15803d 100%)",
     boxShadow: "0 4px 16px 0 rgb(0 0 0 / 0.18)",
     borderRadius: "0.6rem",
@@ -42,8 +50,7 @@ function DraggableDepartment({ dept }: { dept: any }) {
   );
 }
 
-// ----------- GhostOverlay (optimized preview) -----------
-function GhostOverlay({ assignment, gridSize }: { assignment: any[]; gridSize: number }) {
+function GhostOverlay({ assignment, gridSize }: { assignment: Dept[]; gridSize: number }) {
   if (!assignment?.length) return null;
   const meter = getMeter(gridSize);
   return (
@@ -70,7 +77,6 @@ function GhostOverlay({ assignment, gridSize }: { assignment: any[]; gridSize: n
   );
 }
 
-// ----------- GridArea -----------
 function GridArea({
   layout,
   setLayout,
@@ -78,11 +84,11 @@ function GridArea({
   onLayoutChange,
   overlayAssignment,
 }: {
-  layout: any[];
-  setLayout: (v: any[]) => void;
+  layout: Dept[];
+  setLayout: (v: Dept[]) => void;
   gridSize: number;
-  onLayoutChange: (v: any[]) => void;
-  overlayAssignment?: any[] | null;
+  onLayoutChange: (v: Dept[]) => void;
+  overlayAssignment?: Dept[] | null;
 }) {
   const { setNodeRef } = useDroppable({ id: "layout" });
 
@@ -138,17 +144,14 @@ function GridArea({
           }}
         />
 
-        {/* layout ปัจจุบัน */}
         {layout.map((dept) => (
-          <DraggableDepartment key={dept.id} dept={dept} />
+          <DraggableDepartment key={dept.id} dept={{ ...dept, gridSize }} />
         ))}
 
-        {/* overlay แสดง optimized */}
         {overlayAssignment?.length ? (
           <GhostOverlay assignment={overlayAssignment} gridSize={gridSize} />
         ) : null}
 
-        {/* Hint เมื่อยังไม่มีอะไร */}
         {layout.length === 0 && !overlayAssignment?.length && (
           <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
             <div className="rounded-lg px-8 py-4 text-center bg-white/20 text-white/90 text-xl font-bold shadow">
@@ -161,15 +164,14 @@ function GridArea({
   );
 }
 
-// ----------- AddDepartmentForm -----------
-function AddDepartmentForm({ onAdd, gridSize }: { onAdd: (d: any) => void; gridSize: number }) {
+function AddDepartmentForm({ onAdd, gridSize }: { onAdd: (d: Dept) => void; gridSize: number }) {
   const [name, setName] = useState("");
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
   const [x, setX] = useState("");
   const [y, setY] = useState("");
 
-  const handleSubmit = (e: any) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !width || !height || !x || !y) return alert("กรุณากรอกข้อมูลให้ครบ");
     const widthNum = Number(width);
@@ -178,8 +180,7 @@ function AddDepartmentForm({ onAdd, gridSize }: { onAdd: (d: any) => void; gridS
     const yNum = Number(y);
     if (xNum < 0 || yNum < 0 || widthNum <= 0 || heightNum <= 0) return alert("ตำแหน่งและขนาดต้องเป็นค่าบวก");
     if (xNum + widthNum > gridSize || yNum + heightNum > gridSize) return alert("ตำแหน่งและขนาดเกินพื้นที่ทั้งหมด");
-
-    const newDept = {
+    const newDept: Dept = {
       id: `dept_${Date.now()}`,
       name,
       width: widthNum,
@@ -225,8 +226,7 @@ function AddDepartmentForm({ onAdd, gridSize }: { onAdd: (d: any) => void; gridS
   );
 }
 
-// ----------- DepartmentList -----------
-function DepartmentList({ layout, onDelete }: { layout: any[]; onDelete: (id: string) => void; }) {
+function DepartmentList({ layout, onDelete }: { layout: Dept[]; onDelete: (id: string) => void }) {
   return (
     <div>
       <div className="font-semibold text-[#f0f6fc] mb-2 mt-4">แผนก</div>
@@ -248,19 +248,26 @@ function DepartmentList({ layout, onDelete }: { layout: any[]; onDelete: (id: st
   );
 }
 
-// ----------- FlowMatrixInput -----------
-function FlowMatrixInput({ matrix, setMatrix, departmentNames }: { matrix: number[][]; setMatrix: (m: number[][]) => void; departmentNames: string[]; }) {
+function FlowMatrixInput({
+  matrix,
+  setMatrix,
+  departmentNames,
+}: {
+  matrix: number[][]; setMatrix: (m: number[][]) => void; departmentNames: string[];
+}) {
   const n = departmentNames.length;
   React.useEffect(() => {
     if (matrix.length !== n) {
       setMatrix(Array(n).fill(0).map(() => Array(n).fill(0)));
     }
-  }, [n]);
+  }, [n]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleChange(i: number, j: number, v: string) {
     const newMatrix = matrix.map((row) => [...row]);
     newMatrix[i][j] = Number(v);
     setMatrix(newMatrix);
   }
+
   if (n === 0) return null;
   return (
     <div className="my-2">
@@ -299,28 +306,79 @@ function FlowMatrixInput({ matrix, setMatrix, departmentNames }: { matrix: numbe
   );
 }
 
-// ----------- Main PlantLayout Component -----------
+function ProjectModal({
+  open,
+  defaultName = "",
+  onSubmit,
+}: {
+  open: boolean;
+  defaultName?: string;
+  onSubmit: (p: { id: string; name: string }) => void;
+}) {
+  const [name, setName] = React.useState(defaultName);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => setName(defaultName), [defaultName]);
+
+  if (!open) return null;
+
+  async function handleCreate() {
+    if (!name.trim()) return alert("กรุณากรอกชื่อโปรเจกต์");
+    setLoading(true);
+    const userId = 1;
+    const res = await fetch(`${API_BASE}/craft/project`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, userId }),
+    });
+    const data = await res.json();
+    setLoading(false);
+    if (!data?.id) return alert("สร้างโปรเจกต์ไม่สำเร็จ");
+    onSubmit({ id: data.id, name: data.name ?? name });
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+      <div className="bg-black rounded-xl p-6 max-w-xs w-full shadow-2xl">
+        <div className="font-bold text-lg mb-3 text-white">สร้างโปรเจกต์ใหม่</div>
+        <input
+          className="w-full border px-2 py-1 rounded mb-3 bg-white/90 text-slate-900"
+          placeholder="Project name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={handleCreate}
+            className="bg-blue-600 text-white font-bold rounded px-4 py-2 disabled:opacity-60"
+            disabled={loading}
+          >
+            {loading ? "กำลังสร้าง..." : "สร้างโปรเจกต์"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PlantLayout() {
-  const [layout, setLayout] = useState<any[]>([]);
+  const [layout, setLayout] = useState<Dept[]>([]);
   const [gridSize, setGridSize] = useState(30);
   const [zoom, setZoom] = useState(1);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  // modal project
   const [projectId, setProjectId] = useState("");
+  const [projectName, setProjectName] = useState("");
   const [showProjectModal, setShowProjectModal] = useState(true);
   const [layoutName, setLayoutName] = useState("");
 
-  // flow matrix
   const [flowMatrix, setFlowMatrix] = useState<number[][]>([]);
   const departmentNames = layout.map((d) => d.name);
 
-  // distance type
   const [distanceType, setDistanceType] = useState<"manhattan" | "euclidean">("manhattan");
 
-  // optimized preview (ghost)
-  const [optimized, setOptimized] = useState<{ assignment: any[]; totalCost?: number; totalDistance?: number } | null>(null);
+  const [optimized, setOptimized] = useState<{ assignment: Dept[]; totalCost?: number; totalDistance?: number } | null>(null);
 
   React.useEffect(() => {
     setFlowMatrix((prev) => {
@@ -337,21 +395,26 @@ export default function PlantLayout() {
     setOptimized(null);
     try {
       if (!projectId) {
-        alert("ต้องสร้างโปรเจกต์ก่อน");
+        setShowProjectModal(true);
         setLoading(false);
         return;
       }
-      // normalize ให้ซ้ายบนจริงเป็น (0,0)
+      if (layout.length === 0) {
+        alert("โปรดเพิ่มแผนกอย่างน้อย 1 แผนก");
+        setLoading(false);
+        return;
+      }
+
       const minX = Math.min(...layout.map(d => d.x));
       const minY = Math.min(...layout.map(d => d.y));
-      const departments = layout.map(({ id, gridSize, ...rest }) => ({
+      const departments = layout.map(({ id, gridSize: _gs, ...rest }) => ({
         ...rest,
         x: rest.x - minX,
         y: rest.y - minY,
       }));
 
       const payload = {
-        name: layoutName,
+        name: layoutName || `Layout ${new Date().toLocaleString()}`,
         gridSize,
         projectId,
         departments,
@@ -359,7 +422,6 @@ export default function PlantLayout() {
         metric: distanceType,
       };
 
-      console.log("API Data Send:", payload);
       const createRes = await fetch(`${API_BASE}/craft/layout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -375,15 +437,17 @@ export default function PlantLayout() {
 
       const res = await fetch(`${API_BASE}/craft/result?layoutId=${layoutId}`);
       const data = await res.json();
-      console.log("Result data from API:", data);
       setResult(data);
 
-      // ทำเป็น overlay preview (อย่าขยับ layout จริงทันที)
       if (data.assignment && Array.isArray(data.assignment)) {
-        const overlay = data.assignment.map((dep: any) => ({
-          ...dep,
-          gridSize,
+        const overlay: Dept[] = data.assignment.map((dep: any) => ({
           id: dep.id || dep.name,
+          name: dep.name,
+          width: dep.width,
+          height: dep.height,
+          x: dep.x,
+          y: dep.y,
+          gridSize,
         }));
         setOptimized({ assignment: overlay, totalCost: data.totalCost, totalDistance: data.totalDistance });
       }
@@ -395,8 +459,9 @@ export default function PlantLayout() {
     }
   }
 
-  function handleProjectCreated(id: string) {
-    setProjectId(id);
+  function handleProjectCreated(p: { id: string; name: string }) {
+    setProjectId(p.id);
+    setProjectName(p.name);
     setShowProjectModal(false);
   }
 
@@ -404,17 +469,16 @@ export default function PlantLayout() {
     window.location.href = "/login";
   }
 
-  function handleWheel(e: any) {
+  function handleWheel(e: React.WheelEvent) {
     if (e.ctrlKey) {
       e.preventDefault();
       setZoom((z) => Math.min(3, Math.max(0.5, z - e.deltaY * 0.001)));
     }
   }
 
-  const handleAddDept = (newDept: any) => setLayout((prev) => [...prev, newDept]);
+  const handleAddDept = (newDept: Dept) => setLayout((prev) => [...prev, newDept]);
   const handleDeleteDept = (id: string) => setLayout((prev) => prev.filter((d) => d.id !== id));
 
-  // diff (ไว้แสดงรายการที่ย้ายจริง ๆ)
   const diffs = React.useMemo(() => {
     if (!optimized?.assignment?.length) return [];
     return optimized.assignment
@@ -426,13 +490,12 @@ export default function PlantLayout() {
         }
         return null;
       })
-      .filter(Boolean) as any[];
+      .filter(Boolean) as { name: string; from: { x: number; y: number }; to: { x: number; y: number } }[];
   }, [optimized, layout]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#001d3d]">
-      {/* Project Modal (เดิมของคุณ) — ยังคงเดิม */}
-      {/* ...คุณใส่ ProjectModal เหมือนเดิมได้... */}
+      <ProjectModal open={showProjectModal} defaultName={projectName} onSubmit={handleProjectCreated} />
 
       <div className="flex-1 flex items-center justify-center overflow-auto bg-[#002b5c]" onWheel={handleWheel}>
         <div className="flex items-center justify-center w-full h-full" style={{ minHeight: CANVAS_SIZE, minWidth: CANVAS_SIZE }}>
@@ -449,7 +512,14 @@ export default function PlantLayout() {
       </div>
 
       <div className="w-full max-w-[430px] min-w-[310px] h-full px-5 py-7 bg-white/20 backdrop-blur-md border-l border-white/30 shadow-2xl flex flex-col gap-6 overflow-y-auto">
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            onClick={() => setShowProjectModal(true)}
+            className="bg-slate-600 text-white font-bold px-4 py-2 rounded-lg shadow hover:scale-[1.04] transition"
+            title="Create/Change Project"
+          >
+            {projectName ? `Project: ${projectName}` : "Select Project"}
+          </button>
           <button onClick={handleLogout} className="bg-gradient-to-r from-blue-600 to-green-400 text-white font-bold px-4 py-2 rounded-lg shadow hover:scale-[1.04] transition" title="Logout">
             Logout
           </button>
@@ -458,12 +528,11 @@ export default function PlantLayout() {
           </button>
         </div>
 
-        {/* Apply/Discard สำหรับ Ghost Overlay */}
         {optimized?.assignment?.length ? (
           <div className="p-3 rounded bg-emerald-900/20 border border-emerald-500/40 text-emerald-100 space-y-2">
             <div className="font-semibold">Optimized preview ready</div>
             <div className="text-sm">
-              Moves: {diffs.length || 0} change(s)
+              Moves: {diffs.length || 0}
               {result?.totalCost !== undefined && (
                 <div>New Total Cost: <span className="font-bold">{result.totalCost}</span></div>
               )}
@@ -472,7 +541,7 @@ export default function PlantLayout() {
               <button
                 className="px-3 py-2 rounded bg-emerald-600 text-white"
                 onClick={() => {
-                  setLayout(optimized.assignment);
+                  setLayout(optimized.assignment.map(d => ({ ...d, gridSize })));
                   setOptimized(null);
                 }}
               >
@@ -482,7 +551,6 @@ export default function PlantLayout() {
                 Discard
               </button>
             </div>
-            {/* แสดงรายการ diff คร่าว ๆ */}
             {diffs.length > 0 && (
               <div className="text-xs mt-2 space-y-1">
                 {diffs.slice(0, 6).map((d, i) => (
@@ -542,8 +610,8 @@ export default function PlantLayout() {
             <div className="bg-white/10 rounded-lg p-3 text-white space-y-1">
               {"totalCost" in result && <div>Total Cost: {result.totalCost}</div>}
               {"totalDistance" in result && <div>Total Distance: {result.totalDistance}</div>}
-              {result.assignment && (
-                <div>
+              {Array.isArray(result.assignment) && (
+                <div className="max-h-48 overflow-auto pr-1">
                   Assignment (preview):
                   {result.assignment.map((d: any, i: number) => (
                     <div key={i} className="ml-2">
@@ -556,8 +624,8 @@ export default function PlantLayout() {
           ) : !loading && <div className="text-white/50">ยังไม่มีผลลัพธ์</div>}
         </div>
 
-        <AddDepartmentForm onAdd={(d) => setLayout((prev) => [...prev, d])} gridSize={gridSize} />
-        <DepartmentList layout={layout} onDelete={(id) => setLayout((prev) => prev.filter((d) => d.id !== id))} />
+        <AddDepartmentForm onAdd={handleAddDept} gridSize={gridSize} />
+        <DepartmentList layout={layout} onDelete={handleDeleteDept} />
       </div>
     </div>
   );
