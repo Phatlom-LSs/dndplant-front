@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { DndContext, useDraggable, useDroppable } from "@dnd-kit/core";
+import { gridArea, height, width } from "@mui/system";
 
 const CANVAS_SIZE = 900;
 const API_BASE = process.env.NEXT_PUBLIC_CRAFT_CREATE_API as string;
@@ -437,10 +438,17 @@ export default function PlantLayout() {
 
       const res = await fetch(`${API_BASE}/craft/result?layoutId=${layoutId}`);
       const data = await res.json();
-      setResult(data);
+      const assignmentRaw =
+        Array.isArray(data.assignment) ? data.assignment :
+        Array.isArray(data.resultJson?.assignment)  ? data.resultJson.assignment :
+        [];
+      setResult({
+        ...data,
+        assignment: assignmentRaw,
+      });
 
-      if (data.assignment && Array.isArray(data.assignment)) {
-        const overlay: Dept[] = data.assignment.map((dep: any) => ({
+      if (assignmentRaw.length) {
+        const overlay = assignmentRaw.map((dep: any) => ({
           id: dep.id || dep.name,
           name: dep.name,
           width: dep.width,
@@ -449,7 +457,11 @@ export default function PlantLayout() {
           y: dep.y,
           gridSize,
         }));
-        setOptimized({ assignment: overlay, totalCost: data.totalCost, totalDistance: data.totalDistance });
+        setOptimized({
+          assignment: overlay,
+          totalCost: data.totalCost ?? data.resultJson?.totalCost,
+          totalDistance: data.totalDistance ?? data.resultJson?.totalDistance,
+        })
       }
 
       setLoading(false);
@@ -610,7 +622,7 @@ export default function PlantLayout() {
             <div className="bg-white/10 rounded-lg p-3 text-white space-y-1">
               {"totalCost" in result && <div>Total Cost: {result.totalCost}</div>}
               {"totalDistance" in result && <div>Total Distance: {result.totalDistance}</div>}
-              {Array.isArray(result.assignment) && (
+              {Array.isArray(result?.assignment) && (
                 <div className="max-h-48 overflow-auto pr-1">
                   Assignment (preview):
                   {result.assignment.map((d: any, i: number) => (
