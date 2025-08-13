@@ -1,10 +1,37 @@
 "use client";
 import React, { useState } from "react";
 import { DndContext, useDraggable, useDroppable } from "@dnd-kit/core";
-import { gridArea, height, width } from "@mui/system";
 
 const CANVAS_SIZE = 900;
 const API_BASE = process.env.NEXT_PUBLIC_CRAFT_CREATE_API as string;
+type DeptType = 'dept' | 'void';
+type Closeness = 'A' | 'E' | 'I' | 'O' | 'U' | 'X';
+
+const CLOSENESS_WEIGHTS: Record<Closeness, number> = {
+  A: 10, E: 8, I: 6, O: 4, U: 2, X: 0,
+};
+
+function toCostMatrixFromLetters(
+  letters: (number|string)[][],
+  allDepts: { name:string; type?:DeptType }[],
+) {
+  const n = allDepts.length;
+  const out: number[][] = Array.from({length:n},()=>Array(n).fill(0));
+  for (let i=0;i<n;i++){
+    for (let j=0;j<n;j++){
+      const v = letters?.[i]?.[j] ?? 0;
+      if (allDepts[i]?.type === 'void' || allDepts[j]?.type === 'void') {
+        out[i][j] = 0;
+      } else if (typeof v === 'number') {
+        out[i][j] = v;
+      } else {
+        const key = v.toUpperCase() as Closeness;
+        out[i][j] = CLOSENESS_WEIGHTS[key] ?? 0;
+      }
+    }
+  }
+  return out;
+}
 
 type Dept = {
   id: string;
@@ -14,6 +41,9 @@ type Dept = {
   x: number;
   y: number;
   gridSize?: number;
+  type: 'dept' | 'void';
+  locked?: boolean;
+  relations?: Record<string, number>;
 };
 
 function getMeter(gridSize: number) {
@@ -21,22 +51,25 @@ function getMeter(gridSize: number) {
 }
 
 function DraggableDepartment({ dept }: { dept: Dept }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: dept.id });
+  const disabled = !!dept.locked;
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: dept.id, disabled, });
   const style: React.CSSProperties = {
     position: "absolute",
     top: dept.y * getMeter(dept.gridSize ?? 1),
     left: dept.x * getMeter(dept.gridSize ?? 1),
     width: dept.width * getMeter(dept.gridSize ?? 1),
     height: dept.height * getMeter(dept.gridSize ?? 1),
-    background: "linear-gradient(135deg, #4ade80 80%, #15803d 100%)",
+    background: dept.type==='void'
+      ? "repeating-linear-gradient(45deg, rgba(255,255,255,.15) 0 8px, rgba(255,255,255,.08) 8px 16px)"
+      : "linear-gradient(135deg, #4ade80 80%, #15803d 100%)",
     boxShadow: "0 4px 16px 0 rgb(0 0 0 / 0.18)",
     borderRadius: "0.6rem",
     color: "#002b5c",
     fontWeight: "bold",
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
-    cursor: "grab",
+    cursor: disabled ? "not-allowed" : "grab",
     zIndex: 2,
-    border: "2px solid #1e293b",
+    border: dept.type==='void' ? "2px dashed #94a3b8" : "2px solid #1e293b",
   };
   return (
     <div
@@ -47,6 +80,11 @@ function DraggableDepartment({ dept }: { dept: Dept }) {
       className="text-xs flex items-center justify-center select-none relative"
     >
       {dept.name}
+      {dept.locked && (
+        <div className="absolute top-1 right-1 text-[10px] px-1 rounded bg-amber-500/80 text-white">
+          LOCK
+        </div>
+      )}
     </div>
   );
 }
@@ -98,6 +136,7 @@ function GridArea({
     const deptIndex = layout.findIndex((d) => d.id === active.id);
     if (deptIndex === -1) return;
     const moved = layout[deptIndex];
+    if (moved.locked) return;
     const meter = getMeter(gridSize);
     const dx = Math.round(delta.x / meter);
     const dy = Math.round(delta.y / meter);
@@ -171,6 +210,7 @@ function AddDepartmentForm({ onAdd, gridSize }: { onAdd: (d: Dept) => void; grid
   const [height, setHeight] = useState("");
   const [x, setX] = useState("");
   const [y, setY] = useState("");
+  const [isVoid, setIsVoid] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,6 +228,7 @@ function AddDepartmentForm({ onAdd, gridSize }: { onAdd: (d: Dept) => void; grid
       height: heightNum,
       x: xNum,
       y: yNum,
+      type: isVoid ? 'void' : 'dept',
       gridSize,
     };
     onAdd(newDept);
@@ -220,6 +261,10 @@ function AddDepartmentForm({ onAdd, gridSize }: { onAdd: (d: Dept) => void; grid
           <input type="number" min={0} max={gridSize} value={y} onChange={(e) => setY(e.target.value)} required className="w-full border px-2 py-1 rounded bg-white/80 text-[#002b5c] shadow-inner" />
         </div>
       </div>
+      <div className="flex items-center gap-2">
+        <input id="isVoid" type="checkbox" checked={isVoid} onChange={e=>setIsVoid(e.target.checked)} />
+        <label htmlFor="isVoid" className="text-[#f0f6fc] text-sm">เพิ่มเป็น “พื้นที่ว่าง” (void)</label>
+      </div>
       <button type="submit" className="w-full bg-gradient-to-r from-blue-500 to-green-400 text-white py-2 rounded-lg font-bold shadow transition hover:scale-[1.03] hover:shadow-lg duration-150">
         + เพิ่มแผนก
       </button>
@@ -227,19 +272,29 @@ function AddDepartmentForm({ onAdd, gridSize }: { onAdd: (d: Dept) => void; grid
   );
 }
 
-function DepartmentList({ layout, onDelete }: { layout: Dept[]; onDelete: (id: string) => void }) {
+function DepartmentList({ layout, onDelete, onToggleLock }:{
+  layout:any[]; onDelete:(id:string)=>void; onToggleLock:(id:string)=>void;
+}) {
   return (
     <div>
       <div className="font-semibold text-[#f0f6fc] mb-2 mt-4">แผนก</div>
       <div className="bg-white/20 rounded-lg p-2 min-h-[40px]">
-        {layout.length === 0 ? (
-          <p className="text-sm text-white/70">None</p>
-        ) : (
+        {layout.length === 0 ? <p className="text-sm text-white/70">None</p> : (
           <ul className="space-y-1">
-            {layout.map((dept) => (
-              <li key={dept.id} className="flex justify-between items-center py-1 px-1 rounded hover:bg-white/30 transition">
-                <span className="font-medium text-[#e0f2fe]">{dept.name}</span>
-                <button onClick={() => onDelete(dept.id)} className="text-xs text-red-400 hover:text-red-600 font-semibold px-2 py-1 rounded transition" title="Delete" type="button">Delete</button>
+            {layout.map((d)=>(
+              <li key={d.id} className="flex justify-between items-center py-1 px-1 rounded hover:bg-white/30">
+                <span className="font-medium text-[#e0f2fe]">
+                  {d.name} {d.type==='void' && <em className="text-white/60"> (void)</em>}
+                  {d.locked && <em className="text-amber-300 ml-1">[locked]</em>}
+                </span>
+                <div className="flex gap-2">
+                  <button onClick={()=>onToggleLock(d.id)} className="text-xs px-2 py-1 rounded bg-amber-600/70 text-white">
+                    {d.locked ? 'Unlock' : 'Lock'}
+                  </button>
+                  <button onClick={()=>onDelete(d.id)} className="text-xs text-red-400 hover:text-red-600 font-semibold px-2 py-1 rounded">
+                    Delete
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -254,46 +309,45 @@ function FlowMatrixInput({
   setMatrix,
   departmentNames,
 }: {
-  matrix: number[][]; setMatrix: (m: number[][]) => void; departmentNames: string[];
+  matrix: (number|string)[][]; setMatrix: (m: (number|string)[][]) => void; departmentNames: string[];
 }) {
   const n = departmentNames.length;
   React.useEffect(() => {
     if (matrix.length !== n) {
-      setMatrix(Array(n).fill(0).map(() => Array(n).fill(0)));
+      setMatrix(Array.from({length:n},()=>Array(n).fill(0)));
     }
   }, [n]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function handleChange(i: number, j: number, v: string) {
-    const newMatrix = matrix.map((row) => [...row]);
-    newMatrix[i][j] = Number(v);
-    setMatrix(newMatrix);
+  function handleChange(i:number,j:number,v:string){
+    const val = v.trim();
+    const next = matrix.map(r=>[...r]);
+    next[i][j] = val === '' ? 0 : (isNaN(Number(val)) ? val.toUpperCase() : Number(val));
+    setMatrix(next);
   }
 
   if (n === 0) return null;
   return (
     <div className="my-2">
-      <div className="font-semibold text-[#f0f6fc] mb-2">Flow/Cost Matrix (ระหว่างแผนก)</div>
+      <div className="font-semibold text-[#f0f6fc] mb-2">
+        ความสัมพันธ์ (ตัวเลขหรือ A/E/I/O/U/X)
+      </div>
       <div className="overflow-auto">
         <table className="min-w-full border-collapse bg-white/10 text-xs text-[#e0f2fe]">
           <thead>
             <tr>
               <th className="border px-2 py-1 bg-[#334155]">To/From</th>
-              {departmentNames.map((name, i) => (
-                <th className="border px-2 py-1 bg-[#334155]" key={i}>{name}</th>
-              ))}
+              {departmentNames.map((name,i)=><th className="border px-2 py-1 bg-[#334155]" key={i}>{name}</th>)}
             </tr>
           </thead>
           <tbody>
-            {departmentNames.map((from, i) => (
+            {departmentNames.map((from,i)=>(
               <tr key={i}>
                 <th className="border px-2 py-1 bg-[#334155]">{from}</th>
-                {departmentNames.map((to, j) => (
+                {departmentNames.map((to,j)=>(
                   <td className="border px-1 py-1" key={j}>
                     <input
-                      type="number"
-                      min={0}
-                      value={matrix[i]?.[j] ?? 0}
-                      onChange={e => handleChange(i, j, e.target.value)}
+                      value={(matrix[i]?.[j] ?? 0) as any}
+                      onChange={e=>handleChange(i,j,e.target.value)}
                       className="w-14 px-1 py-1 rounded text-[#0f172a] bg-white/80 text-center border"
                     />
                   </td>
@@ -302,6 +356,9 @@ function FlowMatrixInput({
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="text-[10px] mt-1 text-white/70">
+        A=10, E=8, I=6, O=4, U=2, X=0 (B=9, C=7, D=5) — cell เว้นว่าง=0
       </div>
     </div>
   );
@@ -374,7 +431,7 @@ export default function PlantLayout() {
   const [showProjectModal, setShowProjectModal] = useState(true);
   const [layoutName, setLayoutName] = useState("");
 
-  const [flowMatrix, setFlowMatrix] = useState<number[][]>([]);
+  const [flowMatrix, setFlowMatrix] = useState<(number|string)[][]>([]);
   const departmentNames = layout.map((d) => d.name);
 
   const [distanceType, setDistanceType] = useState<"manhattan" | "euclidean">("manhattan");
@@ -406,20 +463,24 @@ export default function PlantLayout() {
         return;
       }
 
-      const minX = Math.min(...layout.map(d => d.x));
+      const minX = Math.min(...layout.map(d=>d.x));
       const minY = Math.min(...layout.map(d => d.y));
       const departments = layout.map(({ id, gridSize: _gs, ...rest }) => ({
         ...rest,
         x: rest.x - minX,
         y: rest.y - minY,
+        type: (rest.type ?? 'dept') as DeptType,
+        locked: !!rest.locked,
       }));
+
+      const costMatrix = toCostMatrixFromLetters(flowMatrix, departments);
 
       const payload = {
         name: layoutName || `Layout ${new Date().toLocaleString()}`,
         gridSize,
         projectId,
         departments,
-        costMatrix: flowMatrix,
+        costMatrix,
         metric: distanceType,
       };
 
@@ -490,6 +551,10 @@ export default function PlantLayout() {
 
   const handleAddDept = (newDept: Dept) => setLayout((prev) => [...prev, newDept]);
   const handleDeleteDept = (id: string) => setLayout((prev) => prev.filter((d) => d.id !== id));
+  
+  const handleToggleLock = (id: string) => {
+    setLayout(prev => prev.map(d => d.id === id ? { ...d, locked: !d.locked } : d));
+  }
 
   const diffs = React.useMemo(() => {
     if (!optimized?.assignment?.length) return [];
@@ -553,7 +618,19 @@ export default function PlantLayout() {
               <button
                 className="px-3 py-2 rounded bg-emerald-600 text-white"
                 onClick={() => {
-                  setLayout(optimized.assignment.map(d => ({ ...d, gridSize })));
+                  setLayout(prev => {
+                    const mapByName = new Map(prev.map(d => [d.name, d]));
+                    return optimized.assignment.map(o => {
+                      const old = mapByName.get(o.name);
+                      return {
+                        ...(old ?? o),
+                        ...o,
+                        gridSize,
+                        type: old?.type ?? 'dept',
+                        locked: old?.locked ?? false,
+                      };
+                    });
+                  });
                   setOptimized(null);
                 }}
               >
@@ -637,7 +714,11 @@ export default function PlantLayout() {
         </div>
 
         <AddDepartmentForm onAdd={handleAddDept} gridSize={gridSize} />
-        <DepartmentList layout={layout} onDelete={handleDeleteDept} />
+        <DepartmentList
+        layout={layout}
+        onDelete={handleDeleteDept}
+        onToggleLock={handleToggleLock} 
+        />
       </div>
     </div>
   );
