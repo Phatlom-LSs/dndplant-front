@@ -316,12 +316,12 @@ function FlowMatrixInput({
     if (matrix.length !== n) {
       setMatrix(Array.from({length:n},()=>Array(n).fill(0)));
     }
-  }, [n]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [n]);
 
-  function handleChange(i:number,j:number,v:string){
-    const val = v.trim();
+  function handleChange(i:number,j:number,val:string){
+    const v = Number(val)
     const next = matrix.map(r=>[...r]);
-    next[i][j] = val === '' ? 0 : (isNaN(Number(val)) ? val.toUpperCase() : Number(val));
+    next[i][j] = isNaN(v) ? 0 : v;
     setMatrix(next);
   }
 
@@ -329,7 +329,7 @@ function FlowMatrixInput({
   return (
     <div className="my-2">
       <div className="font-semibold text-[#f0f6fc] mb-2">
-        ความสัมพันธ์ (ตัวเลขหรือ A/E/I/O/U/X)
+        Flow / Workload
       </div>
       <div className="overflow-auto">
         <table className="min-w-full border-collapse bg-white/10 text-xs text-[#e0f2fe]">
@@ -346,6 +346,7 @@ function FlowMatrixInput({
                 {departmentNames.map((to,j)=>(
                   <td className="border px-1 py-1" key={j}>
                     <input
+                    type="number"
                       value={(matrix[i]?.[j] ?? 0) as any}
                       onChange={e=>handleChange(i,j,e.target.value)}
                       className="w-14 px-1 py-1 rounded text-[#0f172a] bg-white/80 text-center border"
@@ -358,10 +359,63 @@ function FlowMatrixInput({
         </table>
       </div>
       <div className="text-[10px] mt-1 text-white/70">
-        A=10, E=8, I=6, O=4, U=2, X=0 (B=9, C=7, D=5) — cell เว้นว่าง=0
+        Full number only
       </div>
     </div>
   );
+}
+
+const VALID = new Set(['A', 'E', 'I', 'O', 'U', 'X', '']);
+function ClosenessMatrixInput({
+  matrix, setMatrix, departmentNames,
+}: { matrix: string[][]; setMatrix:(m:string[][])=>void; departmentNames:string[] }) {
+  function handleChange(i:number, j:number, val:string) {
+    const v = val.trim().toUpperCase()
+    const next = matrix.map(r=>[...r]);
+    const safe = VALID.has(v as any) ? v: v;
+    next[i][j] =  safe;
+    setMatrix(next)
+  }
+  if (!departmentNames.length) return null;
+  return (
+    <div className="my-2">
+      <div className="font-semibold text-[#f0f6fc] mb-2">
+        Closeness (A/E/I/O/U/X)
+      </div>
+      <div className="overflow-auto">
+        <table className="min-w-full border-collapse bg-white/10 text-xs text-[#e0f2fe]">
+        <thead>
+          <tr>
+            <th className="border px-2 py-1 bg-[#334155]">To/From</th>
+            {departmentNames.map((name,i)=><th className="border px-2 py-1 bg-[#334155]" key={i}>{name}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {departmentNames.map((from,i)=>(
+            <tr key={i}>
+              <th className="border px-2 py-1 bg-[#334155]">
+                {from}
+              </th>
+              {departmentNames.map((to,j)=>(
+                <td key={j} className="border px-1 py-1">
+                  <input
+                    value={matrix[i]?.[j] ?? ''}
+                    onChange={e=>handleChange(i,j,e.target.value)}
+                    placeholder="-"
+                    className="w-12 px-1 py-1 rounded text-[#0f172a] bg-white/80 text-center border uppercase"                  
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+        </table>
+      </div>
+      <div className="text-[10px] mt-1 text-white/70">
+          A/E/I/O/U/X or Empty - Not included void type
+      </div>
+    </div>
+  )
 }
 
 function ProjectModal({
@@ -432,20 +486,21 @@ export default function PlantLayout() {
   const [layoutName, setLayoutName] = useState("");
 
   const [flowMatrix, setFlowMatrix] = useState<(number|string)[][]>([]);
-  const departmentNames = layout.map((d) => d.name);
+  const [closenessMatrix, setClosenessMatrix] = useState<string[][]>([])
+  const departmentOnly = layout.filter(d => d.type !== 'void')
+  const departmentNames = departmentOnly.map((d) => d.name);
+  const [matrixTab, setMatrixTab] = useState<'flow'|'close'>('flow')
 
   const [distanceType, setDistanceType] = useState<"manhattan" | "euclidean">("manhattan");
 
   const [optimized, setOptimized] = useState<{ assignment: Dept[]; totalCost?: number; totalDistance?: number } | null>(null);
 
   React.useEffect(() => {
-    setFlowMatrix((prev) => {
-      if (prev.length !== layout.length) {
-        return Array(layout.length).fill(0).map(() => Array(layout.length).fill(0));
-      }
-      return prev;
-    });
-  }, [layout.length]);
+    const n = departmentNames.length;
+    setFlowMatrix(prev => Array.from({length:n}, (_,i) =>
+      Array.from({length:n}, (_,j) => prev?.[i]?.[j] ?? '')
+    ));
+  }, [departmentNames.length]);
 
   async function handleSubmitLayout() {
     setLoading(true);
@@ -473,16 +528,24 @@ export default function PlantLayout() {
         locked: !!rest.locked,
       }));
 
-      const costMatrix = toCostMatrixFromLetters(flowMatrix, departments);
-
       const payload = {
         name: layoutName || `Layout ${new Date().toLocaleString()}`,
         gridSize,
         projectId,
         departments,
-        costMatrix,
+        flowMatrix,
+        closenessMatrix,
         metric: distanceType,
       };
+
+      const n = departmentNames.length;
+      const flowOK = flowMatrix.length === n && flowMatrix.every(r => r.length === n);
+      const closeOK = closenessMatrix.length === n && closenessMatrix.every(r => r.length === n)
+      if (!flowOK || !closeOK) {
+        alert("Matrix size not match with n of depts")
+        setLoading(false);
+        return;
+      }
 
       const createRes = await fetch(`${API_BASE}/craft/layout`, {
         method: "POST",
@@ -676,9 +739,27 @@ export default function PlantLayout() {
           />
         </div>
 
-        <div className="border-b border-white/30 my-2" />
-
-        <FlowMatrixInput matrix={flowMatrix} setMatrix={setFlowMatrix} departmentNames={departmentNames} />
+        <div className="mt-2">
+          <div className="flex gap-2 mb-2">
+            <button
+              onClick={()=>setMatrixTab('flow')}
+              className={`px-3 py-1 rounded ${matrixTab==='flow'?'bg-white/70 text-slate-900':'bg-white'}`}
+            >
+              Flow/Workload Matrix
+            </button>
+            <button
+              onClick={()=>setMatrixTab('close')}
+              className={`px-3 py-1 rounded ${matrixTab==='close'?'bg-white/70 text-slate-900':'bg-white'}`}
+            >
+              Closeness Matrix
+            </button>
+          </div>
+          {matrixTab==='flow' ? (
+            <FlowMatrixInput matrix={flowMatrix} setMatrix={setFlowMatrix} departmentNames={departmentNames} />
+          ) : (
+            <ClosenessMatrixInput matrix={closenessMatrix} setMatrix={setClosenessMatrix} departmentNames={departmentNames}/>
+          )}
+        </div>
 
         <div className="mb-3">
           <div className="font-semibold text-[#f0f6fc] mb-1">ระยะทาง</div>
