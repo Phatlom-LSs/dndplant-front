@@ -369,9 +369,12 @@ const VALID = new Set(['A', 'E', 'I', 'O', 'U', 'X', '']);
 function ClosenessMatrixInput({
   matrix, setMatrix, departmentNames,
 }: { matrix: string[][]; setMatrix:(m:string[][])=>void; departmentNames:string[] }) {
+
   function handleChange(i:number, j:number, val:string) {
     const v = val.trim().toUpperCase()
     const next = matrix.map(r=>[...r]);
+    while (next.length <= i) next.push([]);
+    while ((next[i] ?? []).length <= j) next[i].push('');
     const safe = VALID.has(v as any) ? v: v;
     next[i][j] =  safe;
     setMatrix(next)
@@ -402,6 +405,7 @@ function ClosenessMatrixInput({
                     value={matrix[i]?.[j] ?? ''}
                     onChange={e=>handleChange(i,j,e.target.value)}
                     placeholder="-"
+                    maxLength={1}
                     className="w-12 px-1 py-1 rounded text-[#0f172a] bg-white/80 text-center border uppercase"                  
                   />
                 </td>
@@ -488,7 +492,7 @@ export default function PlantLayout() {
   const [flowMatrix, setFlowMatrix] = useState<(number|string)[][]>([]);
   const [closenessMatrix, setClosenessMatrix] = useState<string[][]>([])
   const departmentOnly = layout.filter(d => d.type !== 'void')
-  const departmentNames = departmentOnly.map((d) => d.name);
+  const departmentNames = React.useMemo(() => departmentOnly.map(d => d.name), [departmentOnly]);
   const [matrixTab, setMatrixTab] = useState<'flow'|'close'>('flow')
 
   const [distanceType, setDistanceType] = useState<"manhattan" | "euclidean">("manhattan");
@@ -497,10 +501,19 @@ export default function PlantLayout() {
 
   React.useEffect(() => {
     const n = departmentNames.length;
-    setFlowMatrix(prev => Array.from({length:n}, (_,i) =>
-      Array.from({length:n}, (_,j) => prev?.[i]?.[j] ?? '')
-    ));
+    setFlowMatrix(prev => {
+      if (prev.length === n && (n === 0 || prev[0]?.length === n)) return prev;
+      return Array.from({ length: n }, () => Array(n).fill(0));
+  });
   }, [departmentNames.length]);
+
+  React.useEffect(() => {
+    const n = departmentNames.length;
+    setClosenessMatrix(prev => {
+      if (prev.length === n && (n == 0 || prev[0]?.length === n)) return prev;
+      return Array.from({ length: n }, () => Array(n).fill(''));
+    });
+  }, [departmentNames.length])
 
   async function handleSubmitLayout() {
     setLoading(true);
