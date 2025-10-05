@@ -599,7 +599,7 @@ function DeptProtoPanel({
   setGridHeight,
 }: {
   protos: DeptProto[];
-  setProtos: (v: DeptProto[]) => void;
+  setProtos: React.Dispatch<React.SetStateAction<DeptProto[]>>
   gridWidth: number;
   gridHeight: number;
   setGridWidth: (v: number) => void;
