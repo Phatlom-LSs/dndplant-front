@@ -1093,6 +1093,34 @@ export default function PlantLayout() {
         return;
       }
 
+      async function generateCorelap(payload: any) {
+          const res = await fetch(`${API_BASE}/corelap/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+      });
+
+      const text = await res.text();
+      let data: any = null;
+      try { data = JSON.parse(text); } catch {text}
+
+      if (!res.ok) {
+        const msg = data?.error || data?.message || text || `HTTP ${res.status}`;
+        alert(msg);
+        console.error('CORELAP 400', { status: res.status, data, payload });
+        return null
+      }
+
+        const first = data?.candidates?.[0] ?? data;
+        const placements = first?.placements ?? first?.assignment ?? data?.placements;
+        if (!placements?.length) {
+          alert(data?.error || 'ไม่พบผลลัพธ์จากการสร้างผัง');
+          console.warn('CORELAP no placements', data);
+          return null;
+        }
+    return { placements, score: first?.score ?? data?.score };
+  }
+
       // NOTE: canvas uses square gridSize; we render with max(gridWidth, gridHeight)
       const canvasGrid = Math.max(gridWidth, gridHeight);
       const overlay = assignment.map((dep: any) => ({
