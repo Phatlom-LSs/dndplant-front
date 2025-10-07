@@ -19,28 +19,6 @@ const CLOSENESS_WEIGHTS: Record<Closeness | "blank", number> = {
   blank: 0,
 };
 
-function toCostMatrixFromLetters(
-  letters: (number | string)[][],
-  allDepts: { name: string; type?: DeptType }[]
-) {
-  const n = allDepts.length;
-  const out: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      const v = letters?.[i]?.[j] ?? 0;
-      if (allDepts[i]?.type === "void" || allDepts[j]?.type === "void") {
-        out[i][j] = 0;
-      } else if (typeof v === "number") {
-        out[i][j] = v;
-      } else {
-        const key = (v?.toString()?.toUpperCase() || "") as Closeness;
-        out[i][j] = CLOSENESS_WEIGHTS[key] ?? CLOSENESS_WEIGHTS.blank;
-      }
-    }
-  }
-  return out;
-}
-
 type Dept = {
   id: string;
   name: string;
@@ -54,17 +32,46 @@ type Dept = {
   relations?: Record<string, number>;
 };
 
-// --- NEW: Dept prototype for CORELAP/ALDEP (no x,y required)
+// --- Dept prototype for CORELAP/ALDEP (no x,y required)
 type DeptProto = {
   id: string;
   name: string;
-  area?: number;
-  width?: number;
-  height?: number;
+  area?: number;          // cells
+  width?: number;         // cells
+  height?: number;        // cells
   fixed?: boolean;
-  minAspectRatio?: number;
-  maxAspectRatio?: number;
+  minAspectRatio?: number; // w/h
+  maxAspectRatio?: number; // w/h
 };
+
+// ===== helpers (CORELAP/ALDEP) =====
+
+// Normalize closeness to NxN and force diagonal 'X'
+function sanitizeCloseness(names: string[], m: string[][]): string[][] {
+  const n = names.length;
+  const VALID = new Set(["", "A", "E", "I", "O", "U", "X"]);
+  const out: string[][] = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) => {
+      const v = (m?.[i]?.[j] ?? "").toString().trim().toUpperCase();
+      return VALID.has(v) ? v : "";
+    })
+  );
+  for (let i = 0; i < n; i++) while (out[i].length < n) out[i].push("");
+  while (out.length < n) out.push(Array(n).fill(""));
+  for (let i = 0; i < n; i++) out[i][i] = "X";
+  return out;
+}
+
+// Sum required cells from prototypes (area OR width*height)
+function sumRequiredCells(protos: DeptProto[]) {
+  return protos.reduce((s, p) => {
+    if (p.width && p.height) return s + p.width * p.height;
+    if (p.area) return s + p.area;
+    return s;
+  }, 0);
+}
+
+// ===== UI parts =====
 
 function getMeter(gridSize: number) {
   return CANVAS_SIZE / gridSize;
@@ -161,7 +168,7 @@ function GridArea({
   gridSize: number;
   onLayoutChange: (v: Dept[]) => void;
   overlayAssignment?: Dept[] | null;
-  draggableEnabled?: boolean; // NEW: disable dragging in build modes until applied
+  draggableEnabled?: boolean; // disable dragging when building
 }) {
   const { setNodeRef } = useDroppable({ id: "layout" });
 
@@ -550,7 +557,7 @@ function ClosenessMatrixInput({
   );
 }
 
-// --- NEW: Weights panel for closeness ratings
+// Weights panel for closeness ratings
 function WeightsPanel({
   weights,
   setWeights,
@@ -589,7 +596,7 @@ function WeightsPanel({
   );
 }
 
-// --- NEW: DeptProto panel (for build-from-graph modes)
+// DeptProto panel (build-from-graph modes)
 function DeptProtoPanel({
   protos,
   setProtos,
@@ -599,7 +606,7 @@ function DeptProtoPanel({
   setGridHeight,
 }: {
   protos: DeptProto[];
-  setProtos: React.Dispatch<React.SetStateAction<DeptProto[]>>
+  setProtos: React.Dispatch<React.SetStateAction<DeptProto[]>>;
   gridWidth: number;
   gridHeight: number;
   setGridWidth: (v: number) => void;
@@ -888,7 +895,7 @@ export default function PlantLayout() {
   const [closenessMatrix, setClosenessMatrix] = useState<string[][]>([]);
   const departmentOnly = layout.filter((d) => d.type !== "void");
 
-  // --- departmentNames switches source by mode
+  // departmentNames switches source by mode
   const departmentNames = React.useMemo(() => {
     if (mode === "CRAFT") {
       return departmentOnly.map((d) => d.name);
@@ -896,7 +903,7 @@ export default function PlantLayout() {
     return deptProtos.map((d) => d.name);
   }, [mode, departmentOnly, deptProtos]);
 
-  // Align matrices with names length
+  // Flow matrix only for CRAFT
   React.useEffect(() => {
     const n = departmentNames.length;
     setFlowMatrix((prev) => {
@@ -906,11 +913,14 @@ export default function PlantLayout() {
     });
   }, [departmentNames.length, mode]);
 
+  // Closeness align + diagonal 'X'
   React.useEffect(() => {
     const n = departmentNames.length;
     setClosenessMatrix((prev) => {
       if (prev.length === n && (n == 0 || prev[0]?.length === n)) return prev;
-      return Array.from({ length: n }, () => Array(n).fill(""));
+      const M = Array.from({ length: n }, () => Array(n).fill(""));
+      for (let i = 0; i < n; i++) M[i][i] = "X";
+      return M;
     });
   }, [departmentNames.length]);
 
@@ -920,8 +930,8 @@ export default function PlantLayout() {
     totalDistance?: number;
   } | null>(null);
 
+  // ---- CRAFT submit
   async function handleSubmitLayout() {
-    // CRAFT: uses existing layout + flow/closeness as you already had
     setLoading(true);
     setResult(null);
     setOptimized(null);
@@ -1021,7 +1031,7 @@ export default function PlantLayout() {
     }
   }
 
-  // --- NEW: Generate for CORELAP/ALDEP (build-from-graph)
+  // ---- CORELAP/ALDEP generate (build-from-graph)
   async function handleGenerateCorelapAldep() {
     try {
       setLoading(true);
@@ -1033,17 +1043,26 @@ export default function PlantLayout() {
         setLoading(false);
         return;
       }
-      const n = departmentNames.length;
-      const closeOK =
-        closenessMatrix.length === n &&
-        closenessMatrix.every((r) => r.length === n);
-      if (!closeOK) {
-        alert("Closeness matrix ต้องเป็น NxN ตามจำนวนแผนก");
+      if (deptProtos.length === 0) {
+        alert("เพิ่ม Prototype แผนกก่อน");
         setLoading(false);
         return;
       }
-      if (deptProtos.length === 0) {
-        alert("เพิ่ม Prototype แผนกก่อน");
+
+      // simple capacity guard (cells)
+      const required = sumRequiredCells(deptProtos);
+      const capacity = gridWidth * gridHeight;
+      if (required > capacity) {
+        alert(`Grid too small: required ${required} > capacity ${capacity}`);
+        setLoading(false);
+        return;
+      }
+
+      // sanitize closeness to NxN + diagonal 'X'
+      const M = sanitizeCloseness(departmentNames, closenessMatrix);
+      const n = departmentNames.length;
+      if (M.length !== n || M[0].length !== n) {
+        alert("Closeness matrix ต้องเป็น NxN ตามจำนวนแผนก");
         setLoading(false);
         return;
       }
@@ -1059,12 +1078,11 @@ export default function PlantLayout() {
           fixed: !!p.fixed,
           width: p.width || undefined,
           height: p.height || undefined,
-          area:
-            !p.width || !p.height ? (p.area ?? undefined) : undefined,
+          area: p.width && p.height ? undefined : (p.area ?? undefined),
           minAspectRatio: p.minAspectRatio ?? undefined,
           maxAspectRatio: p.maxAspectRatio ?? undefined,
         })),
-        closenessMatrix,
+        closenessMatrix: M,
         weights,
         settings:
           mode === "ALDEP"
@@ -1077,51 +1095,32 @@ export default function PlantLayout() {
           ? `${API_BASE}/corelap/generate`
           : `${API_BASE}/aldep/generate`;
 
+      // robust fetch: read text first so 400 shows message
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
-
-      // accept either {candidates: [...] } or a single result
-      const first = Array.isArray(data?.candidates) ? data.candidates[0] : data;
-      const assignment = first?.placements || first?.assignment || [];
-      if (!assignment.length) {
-        alert("ไม่พบผลลัพธ์จากตัวสร้างผัง");
-        setLoading(false);
-        return;
-      }
-
-      async function generateCorelap(payload: any) {
-          const res = await fetch(`${API_BASE}/corelap/generate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-      });
-
       const text = await res.text();
       let data: any = null;
-      try { data = JSON.parse(text); } catch {text}
+      try { data = JSON.parse(text); } catch { /* keep raw text */ }
 
       if (!res.ok) {
         const msg = data?.error || data?.message || text || `HTTP ${res.status}`;
         alert(msg);
-        console.error('CORELAP 400', { status: res.status, data, payload });
-        return null
+        console.error(`${mode} ${res.status}`, { payload, data });
+        return;
       }
 
-        const first = data?.candidates?.[0] ?? data;
-        const placements = first?.placements ?? first?.assignment ?? data?.placements;
-        if (!placements?.length) {
-          alert(data?.error || 'ไม่พบผลลัพธ์จากการสร้างผัง');
-          console.warn('CORELAP no placements', data);
-          return null;
-        }
-    return { placements, score: first?.score ?? data?.score };
-  }
+      const first = Array.isArray(data?.candidates) ? data.candidates[0] : data;
+      const assignment = first?.placements || first?.assignment || [];
+      if (!assignment?.length) {
+        alert(data?.error || "ไม่พบผลลัพธ์จากตัวสร้างผัง");
+        console.warn(`${mode} response without placements`, data);
+        return;
+      }
 
-      // NOTE: canvas uses square gridSize; we render with max(gridWidth, gridHeight)
+      // preview on square canvas
       const canvasGrid = Math.max(gridWidth, gridHeight);
       const overlay = assignment.map((dep: any) => ({
         id: dep.id || dep.name,
@@ -1142,6 +1141,7 @@ export default function PlantLayout() {
       setResult(first);
     } catch (e) {
       alert("Generate ล้มเหลว กรุณาตรวจ backend");
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -1403,9 +1403,7 @@ export default function PlantLayout() {
             >
               Flow/Workload Matrix
             </button>
-            <button
-              className={`px-3 py-1 rounded bg-white/70 text-slate-900`}
-            >
+            <button className={`px-3 py-1 rounded bg-white/70 text-slate-900`}>
               Closeness Matrix
             </button>
           </div>
@@ -1453,7 +1451,7 @@ export default function PlantLayout() {
           </div>
         )}
 
-        {/* Weights only matter for CORELAP/ALDEP */}
+        {/* Weights only for CORELAP/ALDEP */}
         {mode !== "CRAFT" && (
           <WeightsPanel weights={weights} setWeights={setWeights} />
         )}
