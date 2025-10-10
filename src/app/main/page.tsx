@@ -493,6 +493,8 @@ export default function PlantLayout() {
         closenessMatrix: M, weights,
         cellSizeMeters: cellSize, // เผื่อ BE อยากเก็บ (ไม่บังคับ)
         settings: mode === "ALDEP" ? { aldep: { aisleWidth: 1, stripHeuristic: "row", seeds: 5 } } : { seedRule: "maxDegree", candidateCount: 8 },
+        allowSplitting: true,
+        maxFragmentsPerDept: 3,
       };
 
       const endpoint = mode === "CORELAP" ? `${API_BASE}/corelap/generate` : `${API_BASE}/aldep/generate`;
@@ -505,8 +507,21 @@ export default function PlantLayout() {
       if (!assignment?.length) { alert(data?.error || "ไม่พบผลลัพธ์จากตัวสร้างผัง"); return; }
 
       const canvasGrid = Math.max(gridW, gridH);
-      const overlay = assignment.map((d: any) => ({ id: d.id || d.name, name: d.name, width: d.width, height: d.height, x: d.x, y: d.y, gridSize: canvasGrid, type: "dept" as DeptType }));
-      setOptimized({ assignment: overlay, totalCost: first?.score?.total ?? undefined, totalDistance: first?.score?.closeness ?? undefined });
+      const overlay = assignment.map((d: any) => ({
+        id: d.id || d.name,
+        name: d.name,
+        width: d.width,
+        height: d.height,
+        x: d.x,
+        y: d.y,
+        gridSize: canvasGrid,
+        type: "dept" as DeptType
+      }));
+      setOptimized({
+        assignment: overlay,
+        totalCost: first?.score?.total ?? undefined,
+        totalDistance: first?.score?.closeness ?? undefined
+      });
       setResult(first);
     } catch (e) {
       alert("Generate ล้มเหลว กรุณาตรวจ backend");
