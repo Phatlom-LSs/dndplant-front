@@ -448,12 +448,19 @@ async function handleSubmitLayout() {
       ...rest,
       x: rest.x - minX,
       y: rest.y - minY,
-      type: (rest.type ?? "dept") as DeptType,
+      type: (rest.type === "void" ? "VOID": "DEPT"),
       locked: !!rest.locked,
     }));
 
-    // ตรวจขนาดเมทริกซ์
     const n = departmentNames.length;
+
+    const flow = Array.from({ length: n }, (_, i) =>
+      Array.from({ length: n }, (_, j) => {
+        const v = Number((flowMatrix?.[i]?.[j] ?? 0));
+        return Number.isFinite(v) ? v : 0;
+      })
+    );
+
     if (!(flowMatrix.length === n && flowMatrix.every((r) => r.length === n)
        && closenessMatrix.length === n && closenessMatrix.every((r) => r.length === n))) {
       alert("Matrix size not match with n of depts");
@@ -464,21 +471,19 @@ async function handleSubmitLayout() {
     const payload = {
       name: layoutName || `Layout ${new Date().toLocaleString()}`,
       gridSize,
-      projectId: Number(projectId) || projectId, // แปลงเป็นตัวเลขถ้าเป็นไปได้
+      projectId: Number(projectId) || projectId, // แปลงเป็นตัวเลข
       departments,
-      flowMatrix,
-      closenessMatrix,
+      flowMatrix: flow,
+      closenessMatrix: close,
       metric: distanceType,
     };
 
-    // --- สร้าง layout
     const createRes = await fetch(`${API_BASE}/craft/layout`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
-    // กันกรณี content-type ไม่ใช่ json
     const raw = await createRes.text();
     let createData: any = null;
     try { createData = raw ? JSON.parse(raw) : null; } catch { createData = { raw }; }
@@ -490,7 +495,6 @@ async function handleSubmitLayout() {
       return;
     }
 
-    // --- ดึง layoutId ให้ครอบจักรวาล
     const layoutId =
       createData?.layoutId ??
       createData?.id ??
@@ -508,7 +512,6 @@ async function handleSubmitLayout() {
       return;
     }
 
-    // --- ดึงผล
     const res = await fetch(`${API_BASE}/craft/result?layoutId=${encodeURIComponent(layoutId)}`);
     const text = await res.text();
     let data: any = null;
@@ -521,7 +524,6 @@ async function handleSubmitLayout() {
       return;
     }
 
-    // รองรับหลายทรง
     const assignmentRaw =
       (Array.isArray(data?.assignment) && data.assignment) ||
       (Array.isArray(data?.resultJson?.assignment) && data.resultJson.assignment) ||
