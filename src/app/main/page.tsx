@@ -448,7 +448,7 @@ async function handleSubmitLayout() {
       ...rest,
       x: rest.x - minX,
       y: rest.y - minY,
-      type: (rest.type === "void" ? "VOID": "DEPT"),
+      type: (rest.type === "void" ? "void" : "dept") as "dept" | "void",
       locked: !!rest.locked,
     }));
 
