@@ -436,43 +436,123 @@ export default function PlantLayout() {
   const [optimized, setOptimized] = useState<{ assignment: Dept[]; totalCost?: number; totalDistance?: number; } | null>(null);
 
   /* ---------- submit: CRAFT ---------- */
-  async function handleSubmitLayout() {
-    setLoading(true); setResult(null); setOptimized(null);
-    try {
-      if (!projectId) { setShowProjectModal(true); setLoading(false); return; }
-      if (layout.length === 0) { alert("โปรดเพิ่มแผนกอย่างน้อย 1 แผนก"); setLoading(false); return; }
+async function handleSubmitLayout() {
+  setLoading(true); setResult(null); setOptimized(null);
+  try {
+    if (!projectId) { setShowProjectModal(true); setLoading(false); return; }
+    if (layout.length === 0) { alert("โปรดเพิ่มแผนกอย่างน้อย 1 แผนก"); setLoading(false); return; }
 
-      const minX = Math.min(...layout.map((d) => d.x)), minY = Math.min(...layout.map((d) => d.y));
-      const departments = layout.map(({ id, gridSize: _gs, ...rest }) => ({ ...rest, x: rest.x - minX, y: rest.y - minY, type: (rest.type ?? "dept") as DeptType, locked: !!rest.locked }));
+    // normalize positions ให้เริ่มที่ 0,0
+    const minX = Math.min(...layout.map((d) => d.x)), minY = Math.min(...layout.map((d) => d.y));
+    const departments = layout.map(({ id, gridSize: _gs, ...rest }) => ({
+      ...rest,
+      x: rest.x - minX,
+      y: rest.y - minY,
+      type: (rest.type ?? "dept") as DeptType,
+      locked: !!rest.locked,
+    }));
 
-      const payload = {
-        name: layoutName || `Layout ${new Date().toLocaleString()}`,
-        gridSize, projectId, departments, flowMatrix, closenessMatrix, metric: distanceType,
-      };
+    // ตรวจขนาดเมทริกซ์
+    const n = departmentNames.length;
+    if (!(flowMatrix.length === n && flowMatrix.every((r) => r.length === n)
+       && closenessMatrix.length === n && closenessMatrix.every((r) => r.length === n))) {
+      alert("Matrix size not match with n of depts");
+      setLoading(false);
+      return;
+    }
 
-      const n = departmentNames.length;
-      if (!(flowMatrix.length === n && flowMatrix.every((r) => r.length === n) && closenessMatrix.length === n && closenessMatrix.every((r) => r.length === n))) {
-        alert("Matrix size not match with n of depts"); setLoading(false); return;
-      }
+    const payload = {
+      name: layoutName || `Layout ${new Date().toLocaleString()}`,
+      gridSize,
+      projectId: Number(projectId) || projectId, // แปลงเป็นตัวเลขถ้าเป็นไปได้
+      departments,
+      flowMatrix,
+      closenessMatrix,
+      metric: distanceType,
+    };
 
-      const createRes = await fetch(`${API_BASE}/craft/layout`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const createData = await createRes.json();
-      const layoutId = createData.layoutId || createData.id || createData?.result?.layoutId;
-      if (!layoutId) { alert("Backend ไม่คืน layoutId"); setLoading(false); return; }
+    // --- สร้าง layout
+    const createRes = await fetch(`${API_BASE}/craft/layout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-      const res = await fetch(`${API_BASE}/craft/result?layoutId=${layoutId}`);
-      const data = await res.json();
-      const assignmentRaw = Array.isArray(data.assignment) ? data.assignment : Array.isArray(data.resultJson?.assignment) ? data.resultJson.assignment : [];
-      setResult({ ...data, assignment: assignmentRaw });
+    // กันกรณี content-type ไม่ใช่ json
+    const raw = await createRes.text();
+    let createData: any = null;
+    try { createData = raw ? JSON.parse(raw) : null; } catch { createData = { raw }; }
 
-      if (assignmentRaw.length) {
-        const overlay = assignmentRaw.map((d: any) => ({ id: d.id || d.name, name: d.name, width: d.width, height: d.height, x: d.x, y: d.y, gridSize }));
-        setOptimized({ assignment: overlay, totalCost: data.totalCost ?? data.resultJson?.totalCost, totalDistance: data.totalDistance ?? data.resultJson?.totalDistance });
-      }
-    } catch (err) {
-      alert("ส่ง layout หรือดึงผลลัพธ์ไม่สำเร็จ");
-    } finally { setLoading(false); }
+    if (!createRes.ok) {
+      console.error("Create layout failed", createRes.status, createData);
+      alert(createData?.error || createData?.message || `Create failed: HTTP ${createRes.status}`);
+      setLoading(false);
+      return;
+    }
+
+    // --- ดึง layoutId ให้ครอบจักรวาล
+    const layoutId =
+      createData?.layoutId ??
+      createData?.id ??
+      createData?.result?.layoutId ??
+      createData?.layout?.id ??
+      createData?.data?.layoutId ??
+      createData?.data?.id ??
+      createData?.resultJson?.layoutId ??
+      null;
+
+    if (!layoutId) {
+      console.warn("Unknown createData shape:", createData);
+      alert("Backend ไม่คืน layoutId");
+      setLoading(false);
+      return;
+    }
+
+    // --- ดึงผล
+    const res = await fetch(`${API_BASE}/craft/result?layoutId=${encodeURIComponent(layoutId)}`);
+    const text = await res.text();
+    let data: any = null;
+    try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
+    if (!res.ok) {
+      console.error("Fetch result failed", res.status, data);
+      alert(data?.error || data?.message || `Fetch result failed: HTTP ${res.status}`);
+      setLoading(false);
+      return;
+    }
+
+    // รองรับหลายทรง
+    const assignmentRaw =
+      (Array.isArray(data?.assignment) && data.assignment) ||
+      (Array.isArray(data?.resultJson?.assignment) && data.resultJson.assignment) ||
+      (Array.isArray(data?.placements) && data.placements) ||
+      [];
+
+    setResult({ ...data, assignment: assignmentRaw });
+
+    if (assignmentRaw.length) {
+      const overlay = assignmentRaw.map((d: any) => ({
+        id: d.id || d.name,
+        name: d.name,
+        width: d.width,
+        height: d.height,
+        x: d.x,
+        y: d.y,
+        gridSize,
+      }));
+      setOptimized({
+        assignment: overlay,
+        totalCost: data?.totalCost ?? data?.resultJson?.totalCost ?? data?.score?.total,
+        totalDistance: data?.totalDistance ?? data?.resultJson?.totalDistance ?? data?.score?.closeness,
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    alert("ส่ง layout หรือดึงผลลัพธ์ไม่สำเร็จ");
+  } finally {
+    setLoading(false);
   }
+}
 
   /* ---------- generate: CORELAP/ALDEP (cells) ---------- */
   async function handleGenerateCorelapAldep() {
