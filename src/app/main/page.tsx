@@ -474,7 +474,7 @@ async function handleSubmitLayout() {
       projectId: Number(projectId) || projectId, // แปลงเป็นตัวเลข
       departments,
       flowMatrix: flow,
-      closenessMatrix: close,
+      closenessMatrix,
       metric: distanceType,
     };
 
