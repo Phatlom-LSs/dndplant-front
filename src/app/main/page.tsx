@@ -404,6 +404,14 @@ export default function PlantLayout() {
   const [gridH, setGridH] = useState(30);          // cells
   const [weights, setWeights] = useState({ A: 10, E: 8, I: 6, O: 4, U: 2, X: 0, blank: 0 });
 
+  // === ALDEP params ===
+  const [aldepLowerBound, setAldepLowerBound] =
+    useState<"" | "A" | "E" | "I" | "O" | "U" | "X">("A");
+  const [aldepStripWidth, setAldepStripWidth] = useState<number>(2);
+  const [aldepSeeds, setAldepSeeds] = useState<number>(8);
+  const [aldepAllowSplit, setAldepAllowSplit] = useState<boolean>(true);
+  const [aldepMaxFrags, setAldepMaxFrags] = useState<number>(3);
+
   // shared
   const [zoom, setZoom] = useState(1);
   const [result, setResult] = useState<any>(null);
@@ -414,7 +422,10 @@ export default function PlantLayout() {
   const [closenessMatrix, setClosenessMatrix] = useState<string[][]>([]);
   const departmentOnly = layout.filter((d) => d.type !== "void");
 
-  const departmentNames = React.useMemo(() => (mode === "CRAFT" ? departmentOnly.map((d) => d.name) : deptProtos.map((d) => d.name)), [mode, departmentOnly, deptProtos]);
+  const departmentNames = React.useMemo(
+    () => (mode === "CRAFT" ? departmentOnly.map((d) => d.name) : deptProtos.map((d) => d.name)),
+    [mode, departmentOnly, deptProtos]
+  );
 
   React.useEffect(() => {
     const n = departmentNames.length;
@@ -436,125 +447,125 @@ export default function PlantLayout() {
   const [optimized, setOptimized] = useState<{ assignment: Dept[]; totalCost?: number; totalDistance?: number; } | null>(null);
 
   /* ---------- submit: CRAFT ---------- */
-async function handleSubmitLayout() {
-  setLoading(true); setResult(null); setOptimized(null);
-  try {
-    if (!projectId) { setShowProjectModal(true); setLoading(false); return; }
-    if (layout.length === 0) { alert("โปรดเพิ่มแผนกอย่างน้อย 1 แผนก"); setLoading(false); return; }
+  async function handleSubmitLayout() {
+    setLoading(true); setResult(null); setOptimized(null);
+    try {
+      if (!projectId) { setShowProjectModal(true); setLoading(false); return; }
+      if (layout.length === 0) { alert("โปรดเพิ่มแผนกอย่างน้อย 1 แผนก"); setLoading(false); return; }
 
-    // normalize positions ให้เริ่มที่ 0,0
-    const minX = Math.min(...layout.map((d) => d.x)), minY = Math.min(...layout.map((d) => d.y));
-    const departments = layout.map(({ id, gridSize: _gs, ...rest }) => ({
-      ...rest,
-      x: rest.x - minX,
-      y: rest.y - minY,
-      type: (rest.type === "void" ? "void" : "dept") as "dept" | "void",
-      locked: !!rest.locked,
-    }));
-
-    const n = departmentNames.length;
-
-    const flow = Array.from({ length: n }, (_, i) =>
-      Array.from({ length: n }, (_, j) => {
-        const v = Number((flowMatrix?.[i]?.[j] ?? 0));
-        return Number.isFinite(v) ? v : 0;
-      })
-    );
-
-    if (!(flowMatrix.length === n && flowMatrix.every((r) => r.length === n)
-       && closenessMatrix.length === n && closenessMatrix.every((r) => r.length === n))) {
-      alert("Matrix size not match with n of depts");
-      setLoading(false);
-      return;
-    }
-
-    const payload = {
-      name: layoutName || `Layout ${new Date().toLocaleString()}`,
-      gridSize,
-      projectId: Number(projectId) || projectId, // แปลงเป็นตัวเลข
-      departments,
-      flowMatrix: flow,
-      closenessMatrix,
-      metric: distanceType,
-    };
-
-    const createRes = await fetch(`${API_BASE}/craft/layout`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const raw = await createRes.text();
-    let createData: any = null;
-    try { createData = raw ? JSON.parse(raw) : null; } catch { createData = { raw }; }
-
-    if (!createRes.ok) {
-      console.error("Create layout failed", createRes.status, createData);
-      alert(createData?.error || createData?.message || `Create failed: HTTP ${createRes.status}`);
-      setLoading(false);
-      return;
-    }
-
-    const layoutId =
-      createData?.layoutId ??
-      createData?.id ??
-      createData?.result?.layoutId ??
-      createData?.layout?.id ??
-      createData?.data?.layoutId ??
-      createData?.data?.id ??
-      createData?.resultJson?.layoutId ??
-      null;
-
-    if (!layoutId) {
-      console.warn("Unknown createData shape:", createData);
-      alert("Backend ไม่คืน layoutId");
-      setLoading(false);
-      return;
-    }
-
-    const res = await fetch(`${API_BASE}/craft/result?layoutId=${encodeURIComponent(layoutId)}`);
-    const text = await res.text();
-    let data: any = null;
-    try { data = JSON.parse(text); } catch { data = { raw: text }; }
-
-    if (!res.ok) {
-      console.error("Fetch result failed", res.status, data);
-      alert(data?.error || data?.message || `Fetch result failed: HTTP ${res.status}`);
-      setLoading(false);
-      return;
-    }
-
-    const assignmentRaw =
-      (Array.isArray(data?.assignment) && data.assignment) ||
-      (Array.isArray(data?.resultJson?.assignment) && data.resultJson.assignment) ||
-      (Array.isArray(data?.placements) && data.placements) ||
-      [];
-
-    setResult({ ...data, assignment: assignmentRaw });
-
-    if (assignmentRaw.length) {
-      const overlay = assignmentRaw.map((d: any) => ({
-        id: d.id || d.name,
-        name: d.name,
-        width: d.width,
-        height: d.height,
-        x: d.x,
-        y: d.y,
-        gridSize,
+      // normalize positions ให้เริ่มที่ 0,0
+      const minX = Math.min(...layout.map((d) => d.x)), minY = Math.min(...layout.map((d) => d.y));
+      const departments = layout.map(({ id, gridSize: _gs, ...rest }) => ({
+        ...rest,
+        x: rest.x - minX,
+        y: rest.y - minY,
+        type: (rest.type === "void" ? "void" : "dept") as "dept" | "void",
+        locked: !!rest.locked,
       }));
-      setOptimized({
-        assignment: overlay,
-        totalCost: data?.totalCost ?? data?.resultJson?.totalCost ?? data?.score?.total,
-        totalDistance: data?.totalDistance ?? data?.resultJson?.totalDistance ?? data?.score?.closeness,
+
+      const n = departmentNames.length;
+
+      const flow = Array.from({ length: n }, (_, i) =>
+        Array.from({ length: n }, (_, j) => {
+          const v = Number((flowMatrix?.[i]?.[j] ?? 0));
+          return Number.isFinite(v) ? v : 0;
+        })
+      );
+
+      if (!(flowMatrix.length === n && flowMatrix.every((r) => r.length === n)
+        && closenessMatrix.length === n && closenessMatrix.every((r) => r.length === n))) {
+        alert("Matrix size not match with n of depts");
+        setLoading(false);
+        return;
+      }
+
+      const payload = {
+        name: layoutName || `Layout ${new Date().toLocaleString()}`,
+        gridSize,
+        projectId: Number(projectId) || projectId,
+        departments,
+        flowMatrix: flow,
+        closenessMatrix,
+        metric: distanceType,
+      };
+
+      const createRes = await fetch(`${API_BASE}/craft/layout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
+
+      const raw = await createRes.text();
+      let createData: any = null;
+      try { createData = raw ? JSON.parse(raw) : null; } catch { createData = { raw }; }
+
+      if (!createRes.ok) {
+        console.error("Create layout failed", createRes.status, createData);
+        alert(createData?.error || createData?.message || `Create failed: HTTP ${createRes.status}`);
+        setLoading(false);
+        return;
+      }
+
+      const layoutId =
+        createData?.layoutId ??
+        createData?.id ??
+        createData?.result?.layoutId ??
+        createData?.layout?.id ??
+        createData?.data?.layoutId ??
+        createData?.data?.id ??
+        createData?.resultJson?.layoutId ??
+        null;
+
+      if (!layoutId) {
+        console.warn("Unknown createData shape:", createData);
+        alert("Backend ไม่คืน layoutId");
+        setLoading(false);
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/craft/result?layoutId=${encodeURIComponent(layoutId)}`);
+      const text = await res.text();
+      let data: any = null;
+      try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
+      if (!res.ok) {
+        console.error("Fetch result failed", res.status, data);
+        alert(data?.error || data?.message || `Fetch result failed: HTTP ${res.status}`);
+        setLoading(false);
+        return;
+      }
+
+      const assignmentRaw =
+        (Array.isArray(data?.assignment) && data.assignment) ||
+        (Array.isArray(data?.resultJson?.assignment) && data.resultJson.assignment) ||
+        (Array.isArray(data?.placements) && data.placements) ||
+        [];
+
+      setResult({ ...data, assignment: assignmentRaw });
+
+      if (assignmentRaw.length) {
+        const overlay = assignmentRaw.map((d: any) => ({
+          id: d.id || d.name,
+          name: d.name,
+          width: d.width,
+          height: d.height,
+          x: d.x,
+          y: d.y,
+          gridSize,
+        }));
+        setOptimized({
+          assignment: overlay,
+          totalCost: data?.totalCost ?? data?.resultJson?.totalCost ?? data?.score?.total,
+          totalDistance: data?.totalDistance ?? data?.resultJson?.totalDistance ?? data?.score?.closeness,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      alert("ส่ง layout หรือดึงผลลัพธ์ไม่สำเร็จ");
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error(err);
-    alert("ส่ง layout หรือดึงผลลัพธ์ไม่สำเร็จ");
-  } finally {
-    setLoading(false);
   }
-}
 
   /* ---------- generate: CORELAP/ALDEP (cells) ---------- */
   async function handleGenerateCorelapAldep() {
@@ -567,23 +578,63 @@ async function handleSubmitLayout() {
       if (required > capacity) { alert(`Grid เล็กเกินไป: ต้องใช้ ${required} cells แต่มี ${capacity} cells`); setLoading(false); return; }
 
       const M = sanitizeCloseness(departmentNames, closenessMatrix);
-      const payload = {
-        name: layoutName || `Generated ${new Date().toLocaleString()}`,
-        projectId, gridWidth: gridW, gridHeight: gridH,
-        algorithm: mode.toLowerCase(), // 'corelap' | 'aldep'
-        departments: deptProtos.map((p) => ({ name: p.name, fixed: !!p.fixed, area: p.area })), // area = cells
-        closenessMatrix: M, weights,
-        cellSizeMeters: cellSize, // เผื่อ BE อยากเก็บ (ไม่บังคับ)
-        settings: mode === "ALDEP" ? { aldep: { aisleWidth: 1, stripHeuristic: "row", seeds: 5 } } : { seedRule: "maxDegree", candidateCount: 8 },
-        allowSplitting: true,
-        maxFragmentsPerDept: 3,
-      };
 
-      const endpoint = mode === "CORELAP" ? `${API_BASE}/corelap/generate` : `${API_BASE}/aldep/generate`;
-      const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const text = await res.text(); let data: any = null; try { data = JSON.parse(text); } catch {}
-      if (!res.ok) { alert(data?.error || data?.message || text || `HTTP ${res.status}`); console.error(`${mode} ${res.status}`, { payload, data }); return; }
+      let endpoint = "";
+      let payload: any = null;
 
+      if (mode === "CORELAP") {
+        endpoint = `${API_BASE}/corelap/generate`;
+        payload = {
+          name: layoutName || `Generated ${new Date().toLocaleString()}`,
+          projectId,
+          gridWidth: gridW, gridHeight: gridH,
+          departments: deptProtos.map((p) => ({
+            name: p.name, fixed: !!p.fixed, area: p.area
+          })),
+          closenessMatrix: M,
+          weights,                // CORELAP ใช้ key 'weights'
+          cellSizeMeters: cellSize,
+          allowSplitting: true,
+          maxFragmentsPerDept: 3,
+        };
+      } else {
+        // === ALDEP ===
+        endpoint = `${API_BASE}/aldep/generate`;
+        payload = {
+          name: layoutName || `ALDEP ${new Date().toLocaleString()}`,
+          projectId,
+          gridWidth: gridW, gridHeight: gridH,
+          departments: deptProtos.map((p) => ({
+            name: p.name, fixed: !!p.fixed, area: p.area
+          })),
+          closenessMatrix: M,
+          closenessWeights: weights,  // ALDEP ใช้ key 'closenessWeights'
+          cellSizeMeters: cellSize,
+          // Heuristics/params
+          lowerBound: aldepLowerBound,   // 'A'|'E'|'I'|'O'|'U'|'X'|''
+          stripWidth: aldepStripWidth,   // จำนวนคอลัมน์ต่อแถบ (wide sweep = จำนวนคอลัมน์ต่อ strip)
+          seeds: aldepSeeds,             // จำนวนครั้งสุ่ม seed (wide sweep)
+          allowSplitting: aldepAllowSplit,
+          maxFragmentsPerDept: aldepMaxFrags,
+        };
+      }
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const text = await res.text();
+      let data: any = null; try { data = JSON.parse(text); } catch {}
+
+      if (!res.ok) {
+        alert(data?.error || data?.message || text || `HTTP ${res.status}`);
+        console.error(`${mode} ${res.status}`, { payload, data });
+        return;
+      }
+
+      // รองรับหลายโครงสร้างผลลัพธ์
       const first = Array.isArray(data?.candidates) ? data.candidates[0] : data;
       const assignment = first?.placements || first?.assignment || [];
       if (!assignment?.length) { alert(data?.error || "ไม่พบผลลัพธ์จากตัวสร้างผัง"); return; }
@@ -601,8 +652,8 @@ async function handleSubmitLayout() {
       }));
       setOptimized({
         assignment: overlay,
-        totalCost: first?.score?.total ?? undefined,
-        totalDistance: first?.score?.closeness ?? undefined
+        totalCost: first?.score?.total ?? first?.totalCost ?? undefined,
+        totalDistance: first?.score?.closeness ?? first?.totalDistance ?? undefined
       });
       setResult(first);
     } catch (e) {
@@ -711,6 +762,65 @@ async function handleSubmitLayout() {
           />
         )}
 
+        {/* === ALDEP Settings (เฉพาะตอนเลือก ALDEP) === */}
+        {mode === "ALDEP" && (
+          <div className="space-y-3 mt-2">
+            <div className="font-semibold text-[#f0f6fc]">ALDEP Settings</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-[#f0f6fc]">Lower Bound</label>
+                <select
+                  value={aldepLowerBound}
+                  onChange={(e) => setAldepLowerBound(e.target.value as any)}
+                  className="w-full border px-2 py-1 rounded bg-white/80 text-[#002b5c]"
+                >
+                  {["A","E","I","O","U","X",""].map((k) => (
+                    <option key={k} value={k}>{k || "(blank)"}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-[#f0f6fc]">Strip Width (columns)</label>
+                <input
+                  type="number" min={1}
+                  value={aldepStripWidth}
+                  onChange={(e) => setAldepStripWidth(Number(e.target.value))}
+                  className="w-full border px-2 py-1 rounded bg-white/80 text-[#002b5c]"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-[#f0f6fc]">Seeds (wide sweep)</label>
+                <input
+                  type="number" min={1}
+                  value={aldepSeeds}
+                  onChange={(e) => setAldepSeeds(Number(e.target.value))}
+                  className="w-full border px-2 py-1 rounded bg-white/80 text-[#002b5c]"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-[#f0f6fc]">Max Fragments / dept</label>
+                <input
+                  type="number" min={1}
+                  value={aldepMaxFrags}
+                  onChange={(e) => setAldepMaxFrags(Number(e.target.value))}
+                  className="w-full border px-2 py-1 rounded bg-white/80 text-[#002b5c]"
+                />
+              </div>
+              <div className="col-span-2 flex items-center gap-2">
+                <input
+                  id="aldepSplit"
+                  type="checkbox"
+                  checked={aldepAllowSplit}
+                  onChange={(e) => setAldepAllowSplit(e.target.checked)}
+                />
+                <label htmlFor="aldepSplit" className="text-[#f0f6fc] text-sm">
+                  Allow splitting
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mt-2">
           <div className="flex gap-2 mb-2">
             <button className={`px-3 py-1 rounded ${mode === "CRAFT" ? "bg-white text-slate-900" : "bg-white/40 cursor-not-allowed"}`} disabled={mode !== "CRAFT"}>Flow/Workload Matrix</button>
@@ -719,16 +829,6 @@ async function handleSubmitLayout() {
           {mode === "CRAFT" && (<FlowMatrixInput matrix={flowMatrix} setMatrix={setFlowMatrix} departmentNames={departmentNames} />)}
           <ClosenessMatrixInput matrix={closenessMatrix} setMatrix={setClosenessMatrix} departmentNames={departmentNames} />
         </div>
-
-        {mode === "CRAFT" && (
-          <div className="mb-3">
-            <div className="font-semibold text-[#f0f6fc] mb-1">ระยะทาง</div>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-1 text-[#e0f2fe] text-sm"><input type="radio" name="distanceType" value="manhattan" checked={distanceType === "manhattan"} onChange={() => setDistanceType("manhattan")} /> Manhattan</label>
-              <label className="flex items-center gap-1 text-[#e0f2fe] text-sm"><input type="radio" name="distanceType" value="euclidean" checked={distanceType === "euclidean"} onChange={() => setDistanceType("euclidean")} /> Euclidean</label>
-            </div>
-          </div>
-        )}
 
         {mode !== "CRAFT" && <WeightsPanel weights={weights} setWeights={setWeights} />}
 
@@ -739,6 +839,9 @@ async function handleSubmitLayout() {
             <div className="bg-white/10 rounded-lg p-3 text-white space-y-1">
               {"totalCost" in result && <div>Total Cost: {result.totalCost ?? result?.score?.total}</div>}
               {"totalDistance" in result && <div>Total Distance: {result.totalDistance ?? result?.score?.closeness}</div>}
+              {Array.isArray(result?.order) && (
+                <div className="text-xs">Order: {result.order.join(" → ")}</div>
+              )}
               {Array.isArray(result?.assignment || result?.placements) && (
                 <div className="max-h-48 overflow-auto pr-1">
                   Assignment (preview):
