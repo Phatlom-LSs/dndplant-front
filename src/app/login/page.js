@@ -1,6 +1,5 @@
 "use client";
 
-import { redirect, useRouter } from 'next/navigation';
 import * as React from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -114,15 +113,15 @@ export default function SignIn() {
       });
 
       if (!res.ok) {
-        throw new Error('Invalid credentials');
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.message || errorData?.error || 'Invalid credentials');
       }
 
-      const result = await res.json();
-      localStorage.setItem('access_token', result.access_token);
-      window.location.href = '/main';
+      await res.json();
+      window.location.assign('/main');
     } catch (error) {
       console.error(error);
-      setSubmitError('Invalid email or password');
+      setSubmitError(error instanceof Error ? error.message : 'Invalid email or password');
     } finally {
       setLoading(false);
     }

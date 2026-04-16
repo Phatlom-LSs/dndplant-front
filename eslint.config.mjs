@@ -13,7 +13,7 @@ const eslintConfig = [
   ...compat.config({
     extends: ['next'],
     rules: {
-      'react/display-name'
+      'react/display-name': 'off',
     },
   }),
 ]

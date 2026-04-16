@@ -51,7 +51,7 @@ export default function HomePage() {
         </section>
       </main>
         <footer className="footer">
-            © 2025 Chetthapat Tepthian | Senior Thesis Project | KMUTNB
+            Chetthapat Tepthian | Senior Thesis Project | KMUTNB
         </footer>
     </div>
   );
